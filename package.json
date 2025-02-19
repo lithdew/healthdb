@@ -3,8 +3,9 @@
   "module": "index.ts",
   "type": "module",
   "scripts": {
-    "dev": "vite web",
-    "build": "tsc -b && vite build web",
+    "dev": "bun run --cwd web server.ts",
+    "build": "vite build web",
+    "start": "NODE_ENV=production bun run --cwd web server.ts",
     "lint": "eslint .",
     "preview": "vite preview web"
   },
