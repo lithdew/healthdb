@@ -4,12 +4,18 @@ import type {
   GeminiCountTokensResponse,
 } from "../ai/gemini";
 import { GlobalStoreProvider, useGlobalStore, useMemoryStore } from "./store";
+import { aptos } from "../move/aptos";
+import { useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 function App() {
+  const [queryClient] = useState(new QueryClient());
   return (
-    <GlobalStoreProvider>
-      <Home />
-    </GlobalStoreProvider>
+    <QueryClientProvider client={queryClient}>
+      <GlobalStoreProvider>
+        <Home />
+      </GlobalStoreProvider>
+    </QueryClientProvider>
   );
 }
 
@@ -20,6 +26,15 @@ function LogoutPanel() {
     <>
       <div>
         <span>You are logged in as: {account.accountAddress.toString()}</span>
+      </div>
+      <div>
+        <a
+          href={`https://aptos.dev/en/network/faucet?address=${account.accountAddress.toString()}`}
+          target="_blank"
+          className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
+        >
+          Get testnet tokens
+        </a>
       </div>
     </>
   );
