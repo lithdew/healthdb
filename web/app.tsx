@@ -16,14 +16,9 @@ import type {
   GeminiCountTokensResponse,
 } from "../ai/gemini";
 import React from "react";
-import { useMemoryStore } from "./src/lib/memory";
+import { useMemoryStore } from "./lib/memory";
 
 function App() {
-  const [memory, isLoaded] = useMemoryStore();
-  React.useEffect(() => {
-    console.info({ memory, isLoaded });
-  }, [memory, isLoaded]);
-
   return (
     <AptosWalletAdapterProvider
       autoConnect

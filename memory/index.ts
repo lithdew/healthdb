@@ -5,13 +5,12 @@ import {
   type EmbeddingResult,
 } from "./types";
 import { Embedder } from "./embedder";
-import { Database } from "@sqlite.org/sqlite-wasm";
 import { UpdateMemoryAction } from "../ai/prompts";
 import { getRetrieveFactsPrompt, getUpdateMemoryPrompt } from "../ai/functions";
 import { HNSWVectorStore } from "./vector";
-import type { AskWithGeminiBody, GeminiEvent } from "../ai/google";
 import { createParser } from "eventsource-parser";
-import { db, initializeSQLite } from "../db";
+import type { AskWithGeminiBody, GeminiEvent } from "../ai/gemini";
+import { createDatabase, type DB } from "../db";
 
 export interface Memory {
   id: number;
@@ -21,16 +20,9 @@ export interface Memory {
   updatedAt?: number;
 }
 
-interface DBMemory {
-  id: number;
-  content: string;
-  created_at: number;
-  updated_at?: number;
-}
-
 export class MemoryStore {
   private vector: VectorStore;
-  private db: Database;
+  private db: DB;
   private embedder: Embedder;
 
   constructor({
@@ -40,7 +32,7 @@ export class MemoryStore {
   }: {
     vector: VectorStore;
     embedder: Embedder;
-    db: Database;
+    db: DB;
   }) {
     this.vector = vector;
     this.embedder = embedder;
@@ -48,7 +40,7 @@ export class MemoryStore {
   }
 
   async *askWithGemini(body: AskWithGeminiBody) {
-    const response = await fetch("http://localhost:8080/ask", {
+    const response = await fetch("/ask", {
       method: "POST",
       body: JSON.stringify(body),
     });
@@ -64,6 +56,7 @@ export class MemoryStore {
       async start(controller) {
         const parser = createParser({
           onEvent(event) {
+            console.info("recevied event");
             controller.enqueue(JSON.parse(event.data));
           },
         });
@@ -81,7 +74,6 @@ export class MemoryStore {
     // @ts-expect-error
     for await (const chunk of readable) {
       const event = chunk as GeminiEvent;
-
       yield event;
 
       if (event.candidates[0]?.finishReason === "STOP") {
@@ -108,11 +100,7 @@ export class MemoryStore {
       return null;
     }
 
-    const [memory] = this.db.exec(`SELECT * FROM memories WHERE id = $id`, {
-      bind: { $id: id },
-      returnValue: "resultRows",
-      rowMode: "object",
-    }) as unknown as DBMemory[];
+    const memory = await this.db.memories.get(id);
 
     if (memory === undefined) {
       return null;
@@ -120,8 +108,6 @@ export class MemoryStore {
     return {
       ...memory,
       vector: embedding.vector,
-      createdAt: memory.created_at,
-      updatedAt: memory.updated_at,
     };
   }
 
@@ -133,10 +119,10 @@ export class MemoryStore {
     memoryId: number;
     content: string;
     vector?: Embedding;
-    metadata?: Record<string, any>;
   }) {
     const existingMemory = this.vector.get(memoryId);
-    if (!existingMemory) {
+    const dbMemory = await this.db.memories.get(memoryId);
+    if (existingMemory === null || dbMemory === undefined) {
       return null;
     }
 
@@ -145,14 +131,12 @@ export class MemoryStore {
       if (vector === undefined) throw new Error("failed to embed");
     }
 
-    const [memory] = this.db.exec(
-      "UPDATE memories SET content = $content, SET updated_at = $updated_at WHERE id = $id returning *",
-      {
-        bind: { $content: content, $id: memoryId, $updated_at: Date.now() },
-        returnValue: "resultRows",
-        rowMode: "object",
-      },
-    ) as unknown as DBMemory[];
+    const updatedAt = Date.now();
+
+    await this.db.memories.update(memoryId, {
+      content,
+      updatedAt,
+    });
 
     this.vector.update({
       id: memoryId,
@@ -160,22 +144,22 @@ export class MemoryStore {
     });
 
     return {
-      ...memory,
+      ...existingMemory,
+      ...dbMemory,
       vector,
-      createdAt: memory.created_at,
-      updatedAt: memory.updated_at,
+      updatedAt,
+      content,
     };
   }
 
   async deleteMemory(id: number) {
     this.vector.delete(id);
-    this.db.exec("DELETE FROM memories WHERE id = $id", {
-      bind: { $id: id },
-    });
+    await this.db.memories.delete(id);
   }
 
   async readAllAndValidate<TSchema extends z.ZodTypeAny>(
-    response: AsyncGenerator<GeminiEvent, void, unknown>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    response: AsyncGenerator<GeminiEvent, any, unknown>,
     schema: TSchema,
   ): Promise<z.infer<TSchema>> {
     const content = await this.readAll(response);
@@ -194,13 +178,13 @@ export class MemoryStore {
         ? existingEmbeddings[content]
         : (await this.embedder.embed([content]))[0];
 
-    const res = this.db.exec(
-      `INSERT INTO memories (content) VALUES ($content) RETURNING id, created_at`,
-      { bind: { $content: content }, returnValue: "resultRows" },
-    );
-    const id = res.at(0)?.at(0) as number;
-    const createdAt = res.at(0)?.at(1) as number;
-    if (!id) throw new Error("Failed to insert into db");
+    const createdAt = new Date().getTime();
+
+    const id = await this.db.memories.add({
+      content,
+      createdAt,
+    });
+
     this.vector.add([{ vector: embeddings, id }]);
     return { id, content, vector: embeddings, createdAt };
   }
@@ -225,12 +209,9 @@ export class MemoryStore {
       newMessageEmbeddings[fact] = factEmbedding;
       const relatedEmbeddings = this.vector.search(factEmbedding);
       const memories = relatedEmbeddings.length
-        ? (this.db.exec(
-            `SELECT * FROM memories WHERE id in [${relatedEmbeddings.map((v) => v.id).join("\n")}]`,
-            { returnValue: "resultRows", rowMode: "object" },
-          ) as unknown as Omit<Memory, "vector">[])
+        ? await this.db.memories.bulkGet(relatedEmbeddings.map((v) => v.id))
         : [];
-      for (const memory of memories) {
+      for (const memory of memories.filter((m) => m !== undefined)) {
         const vector = relatedEmbeddings.find(
           (v) => v.id === memory.id,
         )?.vector;
@@ -334,15 +315,8 @@ export class MemoryStore {
 
 export const createMemoryStore = async () => {
   const embedder = new Embedder();
-  const vector = new HNSWVectorStore("hnsw-db", 384);
-  const db = await initializeSQLite();
-  const memory = new MemoryStore({ vector, db: db!, embedder });
+  const db = await createDatabase();
+  const vector = new HNSWVectorStore(db, 384);
+  const memory = new MemoryStore({ vector, embedder, db });
   return memory;
 };
-
-// if (import.meta.env) {
-//   const embedder = new Embedder();
-//   const vector = new HNSWVectorStore("hnsw-db", 384);
-//   const db = await initializeSQLite();
-//   const memory = new MemoryStore({ vector, db, embedder });
-// }

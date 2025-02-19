@@ -39,23 +39,23 @@ interface NextFunction {
 
 type ConnectMiddleware<
   PlatformRequest extends IncomingMessage = IncomingMessage,
-  PlatformResponse extends ServerResponse = ServerResponse
+  PlatformResponse extends ServerResponse = ServerResponse,
 > = (
   req: PlatformRequest,
   res: PlatformResponse,
-  next: NextFunction
+  next: NextFunction,
 ) => void | Promise<void>;
 type ConnectMiddlewareBoolean<
   PlatformRequest extends IncomingMessage = IncomingMessage,
-  PlatformResponse extends ServerResponse = ServerResponse
+  PlatformResponse extends ServerResponse = ServerResponse,
 > = (
   req: PlatformRequest,
   res: PlatformResponse,
-  next: NextFunction
+  next: NextFunction,
 ) => boolean | Promise<boolean>;
 
 type WebHandler = (
-  request: Request
+  request: Request,
 ) => Response | undefined | Promise<Response | undefined>;
 
 function createServerResponse(incomingMessage: IncomingMessage): {
@@ -65,7 +65,7 @@ function createServerResponse(incomingMessage: IncomingMessage): {
       readable: Readable;
       headers: OutgoingHttpHeaders;
       statusCode: number;
-    }) => void
+    }) => void,
   ) => void;
 } {
   const res = new ServerResponse(incomingMessage);
@@ -77,7 +77,7 @@ function createServerResponse(incomingMessage: IncomingMessage): {
       readable: Readable;
       headers: OutgoingHttpHeaders;
       statusCode: number;
-    }) => void
+    }) => void,
   ) => {
     const handleReadable = () => {
       if (handled) return;
@@ -110,7 +110,7 @@ function createServerResponse(incomingMessage: IncomingMessage): {
   res.writeHead = function writeHead(
     statusCode: number,
     statusMessage?: string | OutgoingHttpHeaders | OutgoingHttpHeader[],
-    headers?: OutgoingHttpHeaders | OutgoingHttpHeader[]
+    headers?: OutgoingHttpHeaders | OutgoingHttpHeader[],
   ): ServerResponse {
     res.statusCode = statusCode;
     if (typeof statusMessage === "object") {
@@ -156,7 +156,7 @@ function flattenHeaders(headers: OutgoingHttpHeaders): [string, string][] {
 }
 
 function connectToWeb(
-  handler: ConnectMiddleware | ConnectMiddlewareBoolean
+  handler: ConnectMiddleware | ConnectMiddlewareBoolean,
 ): WebHandler {
   return async (request: Request): Promise<Response | undefined> => {
     const req = createIncomingMessage(request);
@@ -171,7 +171,7 @@ function connectToWeb(
           new Response(responseBody, {
             status: statusCode,
             headers: flattenHeaders(headers),
-          })
+          }),
         );
       });
 
@@ -306,12 +306,14 @@ Bun.serve({
 
         const template = await runtime.server.transformIndexHtml(
           url.pathname,
-          entrypoint
+          entrypoint,
         );
 
         return new Response(template, {
           headers: {
             "Content-Type": "text/html",
+            "Cross-Origin-Embedder-Policy": "require-corp",
+            "Cross-Origin-Opener-Policy": "same-origin",
           },
         });
       } else {

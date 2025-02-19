@@ -42,7 +42,7 @@ export default async function handler({
             .enum(["gemini-1.5-flash", "gemini-2.0-flash"])
             .optional()
             .default("gemini-1.5-flash"),
-        })
+        }),
       )
       .safeParse(await req.json());
     if (!result.success) {
@@ -70,9 +70,9 @@ export default async function handler({
         headers: {
           "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
-          "Connection": "keep-alive",
+          Connection: "keep-alive",
         },
-      }
+      },
     );
   }
 
@@ -84,7 +84,7 @@ export default async function handler({
             .enum(["gemini-1.5-flash", "gemini-2.0-flash"])
             .optional()
             .default("gemini-1.5-flash"),
-        })
+        }),
       )
       .safeParse(await req.json());
     if (!result.success) {
@@ -108,13 +108,14 @@ export default async function handler({
 
 async function getTokenCount(
   model: AskWithGeminiParams["model"],
-  body: AskWithGeminiBody
+  body: AskWithGeminiBody,
 ) {
   const key = stringify(body);
   const cached = db
-    .query<{ value: string }, [string]>(
-      "select value from token_count_cache where key = ?"
-    )
+    .query<
+      { value: string },
+      [string]
+    >("select value from token_count_cache where key = ?")
     .get(key);
   if (cached !== null) {
     return JSON.parse(cached.value);
@@ -128,7 +129,7 @@ async function getTokenCount(
   });
 
   db.query(
-    "insert or replace into token_count_cache (key, value) values (?, ?)"
+    "insert or replace into token_count_cache (key, value) values (?, ?)",
   ).run(key, JSON.stringify(response));
 
   return response;

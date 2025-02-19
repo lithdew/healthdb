@@ -1,29 +1,26 @@
-import Dexie, { type EntityTable } from "dexie";
-import { cosineSimilarity, HNSW, Node } from "../hnsw/hnsw";
+import { cosineSimilarity, HNSW } from "../hnsw/hnsw";
 import type { Embedding, EmbeddingResult, VectorStore } from "./types";
-import { Embedder } from "./embedder";
+import type { Database } from "../db";
 
 export class HNSWVectorStore implements VectorStore {
   hnsw: HNSW;
-  dexie: Dexie & {
-    hnswStore: EntityTable<Node, "id">;
-  };
-  dexieDbName: string;
+  db: Database;
+  changed: boolean = false;
 
-  constructor(dexieDbName: string, dimension: number) {
+  constructor(db: Database, dimension: number) {
+    this.db = db;
     this.hnsw = new HNSW({
       efConstruction: 200,
       M: 16,
       d: dimension,
       metric: cosineSimilarity,
     });
-    this.dexieDbName = dexieDbName;
-    this.dexie = new Dexie(dexieDbName) as Dexie & {
-      hnswStore: EntityTable<Node, "id">;
-    };
-    this.dexie.version(1).stores({
-      friends: "++id, level, vector, numbers", // primary key "id" (for the runtime!)
-    });
+    setInterval(() => {
+      if (this.changed) {
+        this.save();
+        this.changed = false;
+      }
+    }, 5000);
   }
 
   get(id: number): EmbeddingResult | null {
@@ -35,6 +32,7 @@ export class HNSWVectorStore implements VectorStore {
   }
 
   add(embeddings: EmbeddingResult[]): EmbeddingResult[] {
+    this.changed = true;
     for (const embedding of embeddings) {
       this.hnsw.add(embedding.id, embedding.vector);
     }
@@ -42,6 +40,7 @@ export class HNSWVectorStore implements VectorStore {
   }
 
   update(embedding: { id: number; vector: Embedding }): EmbeddingResult {
+    this.changed = true;
     const node = this.hnsw.nodes.get(embedding.id);
     if (node === undefined) {
       throw new Error("Node not found");
@@ -52,6 +51,7 @@ export class HNSWVectorStore implements VectorStore {
   }
 
   delete(id: number): void {
+    this.changed = true;
     this.hnsw.nodes.delete(id);
   }
 
@@ -67,21 +67,18 @@ export class HNSWVectorStore implements VectorStore {
     return nodes;
   }
 
-  list(props?: { cursor?: string; limit?: number }): EmbeddingResult[] {
-    throw new Error("Method not implemented.");
+  async list(): Promise<EmbeddingResult[]> {
+    const items = await this.db.hnswNodes.toArray();
+    return items.map((i) => ({ id: i.id, vector: i.vector }));
   }
 
   async save() {
-    this.dexie.version(1).stores({
-      hnswStore: "key,value", // 'key' and 'value' are indexed properties
-    });
-    await this.dexie.open();
-    this.dexie.hnswStore.bulkPut(Array.from(this.hnsw.nodes.values()));
+    this.db.hnswNodes.bulkPut(Array.from(this.hnsw.nodes.values()));
   }
 
   async load() {
-    await this.dexie.open();
-    const nodes = await this.dexie.hnswStore.toArray();
+    await this.db.open();
+    const nodes = await this.db.hnswNodes.toArray();
     for (const node of nodes) {
       this.hnsw.add(node.id, node.vector);
     }

@@ -22,7 +22,7 @@ export interface VectorStore {
     embedding: Embedding,
     opts?: { threshold?: number; topK?: number },
   ): EmbeddingResult[];
-  list(props?: { cursor?: string; limit?: number }): EmbeddingResult[];
+  list(props?: { cursor?: string; limit?: number }): Promise<EmbeddingResult[]>;
 }
 
 export interface LLM {

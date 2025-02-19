@@ -1,3 +1,4 @@
+import { zodToVertexSchema } from "@techery/zod-to-vertex-schema";
 import {
   EXTRACT_MEASUREMENT_PROMPT,
   FACT_RETRIEVAL_PROMPT,
@@ -16,7 +17,7 @@ export function getRetrieveFactsPrompt(text: string) {
     schema: responseSchema,
     body: {
       systemInstruction: {
-        role: "system" as const,
+        role: "model" as const,
         parts: [
           {
             text: FACT_RETRIEVAL_PROMPT.replace(
@@ -34,7 +35,7 @@ export function getRetrieveFactsPrompt(text: string) {
       ],
       generationConfig: {
         responseMimeType: "application/json" as const,
-        responseSchema,
+        responseSchema: zodToVertexSchema(responseSchema),
       },
     },
   };
@@ -126,7 +127,7 @@ export function getUpdateMemoryPrompt(
   return {
     body: {
       systemInstruction: {
-        role: "system" as const,
+        role: "model" as const,
         parts: [{ text: system }],
       },
       contents: [{ role: "user" as const, parts: [{ text: user }] }],

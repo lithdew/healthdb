@@ -21,20 +21,11 @@ export async function* askWithGemini(params: AskWithGeminiParams) {
 
   const body = { ...params.body };
 
-  if (
-    body.generationConfig?.responseSchema !== undefined &&
-    body.generationConfig.responseSchema instanceof z.Schema
-  ) {
-    body.generationConfig.responseSchema = zodToVertexSchema(
-      body.generationConfig.responseSchema
-    );
-  }
-
   for (const tool of body.tools ?? []) {
     for (const functionDeclaration of tool.functionDeclarations ?? []) {
       if (functionDeclaration.parameters instanceof z.Schema) {
         functionDeclaration.parameters = zodToVertexSchema(
-          functionDeclaration.parameters
+          functionDeclaration.parameters,
         );
       }
     }
@@ -48,7 +39,7 @@ export async function* askWithGemini(params: AskWithGeminiParams) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(body),
-    }
+    },
   );
 
   if (response.body === null) {
@@ -56,7 +47,7 @@ export async function* askWithGemini(params: AskWithGeminiParams) {
   }
 
   const stream = response.body.pipeThrough(
-    new TextDecoderStream("utf-8", { fatal: true })
+    new TextDecoderStream("utf-8", { fatal: true }),
   );
 
   const readable = new ReadableStream<GeminiEvent>({
@@ -102,22 +93,23 @@ export async function countTokens(params: AskWithGeminiParams) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(params.body),
-    }
+    },
   );
 
   const text = await response.text();
   // endpoint responds with weird 'data: ' prefix, so have to replace first
   return geminiCountTokensResponse.parse(
-    JSON.parse(text.replace("data: ", ""))
+    JSON.parse(text.replace("data: ", "")),
   );
 }
 
 export async function readAll(
-  response: AsyncGenerator<GeminiEvent, void, unknown>
+  response: AsyncGenerator<GeminiEvent, void, unknown>,
 ) {
   let content = "";
   for await (const chunk of response) {
     const text = chunk.candidates[0]?.content.parts[0]?.text;
+    console.info(chunk);
     if (text !== undefined) {
       content += text;
     }
@@ -128,7 +120,7 @@ export async function readAll(
 
 export async function readAllAndValidate<TSchema extends z.ZodTypeAny>(
   response: AsyncGenerator<GeminiEvent, void, unknown>,
-  schema: TSchema
+  schema: TSchema,
 ): Promise<z.infer<TSchema>> {
   const content = await readAll(response);
   return schema.parse(JSON.parse(content));
