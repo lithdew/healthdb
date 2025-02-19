@@ -35,7 +35,7 @@ type GeminiEvent = {
   };
 };
 
-export async function askWithGemini(params: {
+export async function* askWithGemini(params: {
   location: "us-central1";
   projectId: string;
   model: "gemini-1.5-flash" | "gemini-2.0-flash";
@@ -142,27 +142,20 @@ export async function askWithGemini(params: {
     },
   });
 
-  let content = "";
-
   // @ts-expect-error
   for await (const chunk of readable) {
     const event = chunk as GeminiEvent;
 
-    const text = event.candidates[0]?.content.parts[0]?.text;
-    if (text !== undefined) {
-      content += text;
-    }
+    yield event;
 
     if (event.candidates[0]?.finishReason === "STOP") {
       break;
     }
   }
-
-  return content;
 }
 
 if (import.meta.main) {
-  const response = await askWithGemini({
+  const response = askWithGemini({
     location: "us-central1",
     projectId: "lithdew",
     model: "gemini-1.5-flash",
@@ -170,5 +163,20 @@ if (import.meta.main) {
       contents: [{ role: "user", parts: [{ text: "Hi! How are you?" }] }],
     },
   });
-  console.log(response);
+
+  let content = "";
+  for await (const event of response) {
+    const text = event.candidates[0]?.content.parts[0]?.text;
+    if (text !== undefined) {
+      process.stdout.write(text);
+      content += text;
+    }
+
+    if (event.candidates[0]?.finishReason === "STOP") {
+      process.stdout.write("\n");
+      break;
+    }
+  }
+
+  console.log(content);
 }
