@@ -140,7 +140,8 @@ function Home() {
           <button
             className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
             onClick={async () => {
-              memory?.list();
+              const memories = await memory?.list();
+              console.info(memories);
             }}
           >
             list memories

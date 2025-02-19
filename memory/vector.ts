@@ -16,6 +16,7 @@ export class HNSWVectorStore implements VectorStore {
       d: dimension,
       metric: cosineSimilarity,
     });
+    this.load();
     setInterval(() => {
       if (this.changed) {
         this.save();

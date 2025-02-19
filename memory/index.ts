@@ -301,6 +301,9 @@ export class MemoryStore {
 
   async list(props?: { offset: number; limit: number }) {
     const memories = await this.db.memories.toArray();
-    const embeddings = this.vector.list();
+    return memories.map((m) => ({
+      ...m,
+      vector: this.vector.get(m.id)!.vector,
+    }));
   }
 }
