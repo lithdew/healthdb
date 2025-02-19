@@ -1,11 +1,14 @@
+import { Network } from "@aptos-labs/ts-sdk";
 import {
   AptosWalletAdapterProvider,
   groupAndSortWallets,
   useWallet,
   WalletItem,
 } from "@aptos-labs/wallet-adapter-react";
-import { Network } from "@aptos-labs/ts-sdk";
-import type { AskWithGeminiBody } from "../ai/gemini";
+import type {
+  AskWithGeminiBody,
+  GeminiCountTokensResponse,
+} from "../ai/gemini";
 
 function App() {
   return (
@@ -94,6 +97,7 @@ function Home() {
             </>
           )}
           <button
+            className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
             onClick={async () => {
               const response = await fetch("/ask", {
                 method: "POST",
@@ -112,7 +116,26 @@ function Home() {
               }
             }}
           >
-            fun
+            stream example prompt
+          </button>
+          <button
+            className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
+            onClick={async () => {
+              const response = await fetch("/tokens", {
+                method: "POST",
+                body: JSON.stringify({
+                  contents: [
+                    { role: "user", parts: [{ text: "Hi! How are you?" }] },
+                  ],
+                } satisfies AskWithGeminiBody),
+              });
+
+              const result: GeminiCountTokensResponse = await response.json();
+
+              console.log(result);
+            }}
+          >
+            count tokens
           </button>
         </div>
       </div>

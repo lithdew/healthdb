@@ -7,6 +7,7 @@
         "@aptos-connect/wallet-adapter-plugin": "^2.3.4",
         "@aptos-labs/ts-sdk": "^1.35.0",
         "@aptos-labs/wallet-adapter-react": "^3.8.0",
+        "@solana/fast-stable-stringify": "^2.0.0",
         "@sqlite.org/sqlite-wasm": "^3.49.1-build1",
         "@techery/zod-to-vertex-schema": "^0.1.4",
         "@thalalabs/surf": "^1.8.1",
@@ -16,6 +17,7 @@
         "fastpriorityqueue": "^0.7.5",
         "google-auth-library": "^9.15.1",
         "motion": "^12.4.4",
+        "outdent": "^0.8.0",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
         "zod": "^3.24.2",
@@ -252,6 +254,8 @@
     "@scure/bip39": ["@scure/bip39@1.5.4", "", { "dependencies": { "@noble/hashes": "~1.7.1", "@scure/base": "~1.2.4" } }, "sha512-TFM4ni0vKvCfBpohoh+/lY05i9gRbSwXWngAsF4CABQxoaOHijxuaZ2R6cStDQ5CHtHO9aGJTr4ksVJASRRyMA=="],
 
     "@sindresorhus/is": ["@sindresorhus/is@4.6.0", "", {}, "sha512-t09vSN3MdfsyCHoFcTRCH/iUtG7OJ0CsjzB8cjAmKc/va/kIgeDI/TxsigdncE/4be734m0cvIYwNaV4i2XqAw=="],
+
+    "@solana/fast-stable-stringify": ["@solana/fast-stable-stringify@2.0.0", "", { "peerDependencies": { "typescript": ">=5" } }, "sha512-EsIx9z+eoxOmC+FpzhEb+H67CCYTbs/omAqXD4EdEYnCHWrI1li1oYBV+NoKzfx8fKlX+nzNB7S/9kc4u7Etpw=="],
 
     "@sqlite.org/sqlite-wasm": ["@sqlite.org/sqlite-wasm@3.49.1-build1", "", { "bin": { "sqlite-wasm": "bin/index.js" } }, "sha512-81N0Al5QSmMjxo9CMPWSc9gMJm+c/dbToPSPeXA//8V9B3WbO758bPh7ODrBN7rY3yhr/ZwXHP4QgpHWLa7AdA=="],
 
@@ -882,6 +886,8 @@
     "optionator": ["optionator@0.9.4", "", { "dependencies": { "deep-is": "^0.1.3", "fast-levenshtein": "^2.0.6", "levn": "^0.4.1", "prelude-ls": "^1.2.1", "type-check": "^0.4.0", "word-wrap": "^1.2.5" } }, "sha512-6IpQ7mKUxRcZNLIObR0hz7lxsapSSIYNZJwXPGeF0mTVqGKFIXj1DQcMoT22S3ROcLyY/rz0PWaWZ9ayWmad9g=="],
 
     "os-browserify": ["os-browserify@0.3.0", "", {}, "sha512-gjcpUc3clBf9+210TRaDWbf+rZZZEshZ+DlXMRCeAjp0xhTrnQsKHypIy1J3d5hKdUzj69t708EHtU8P6bUn0A=="],
+
+    "outdent": ["outdent@0.8.0", "", {}, "sha512-KiOAIsdpUTcAXuykya5fnVVT+/5uS0Q1mrkRHcF89tpieSmY33O/tmc54CqwA+bfhbtEfZUNLHaPUiB9X3jt1A=="],
 
     "p-cancelable": ["p-cancelable@2.1.1", "", {}, "sha512-BZOr3nRQHOntUjTrH8+Lh54smKHoHyur8We1V8DSMVrl5A2malOOwuJRnKRDjSnkoeBh4at6BwEnb5I7Jl31wg=="],
 

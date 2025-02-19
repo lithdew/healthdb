@@ -2,7 +2,11 @@ import { zodToVertexSchema } from "@techery/zod-to-vertex-schema";
 import { createParser } from "eventsource-parser";
 import { GoogleAuth } from "google-auth-library";
 import { z } from "zod";
-import type { AskWithGeminiParams, GeminiEvent } from "./gemini";
+import {
+  geminiCountTokensResponse,
+  type AskWithGeminiParams,
+  type GeminiEvent,
+} from "./gemini";
 
 export const auth = new GoogleAuth({
   scopes: "https://www.googleapis.com/auth/cloud-platform",
@@ -84,17 +88,6 @@ export async function* askWithGemini(params: AskWithGeminiParams) {
   }
 }
 
-const countTokenResponse = z.object({
-  totalTokens: z.number(),
-  totalBillableCharacters: z.number(),
-  promptTokensDetails: z.array(
-    z.object({
-      modality: z.enum(["TEXT", "IMAGE"]),
-      tokenCount: z.number(),
-    })
-  ),
-});
-
 export async function countTokens(params: AskWithGeminiParams) {
   const apiKey = await auth.getAccessToken();
   if (apiKey === null || apiKey === undefined) {
@@ -114,7 +107,9 @@ export async function countTokens(params: AskWithGeminiParams) {
 
   const text = await response.text();
   // endpoint responds with weird 'data: ' prefix, so have to replace first
-  return countTokenResponse.parse(JSON.parse(text.replace("data: ", "")));
+  return geminiCountTokensResponse.parse(
+    JSON.parse(text.replace("data: ", ""))
+  );
 }
 
 export async function readAll(

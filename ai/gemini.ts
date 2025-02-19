@@ -92,6 +92,19 @@ export const askWithGeminiParamsSchema = z.object({
   body: askWithGeminiBodySchema,
 });
 
+export const geminiCountTokensResponse = z
+  .object({
+    totalTokens: z.number(),
+    totalBillableCharacters: z.number(),
+    promptTokensDetails: z.array(
+      z.object({
+        modality: z.enum(["TEXT", "IMAGE"]),
+        tokenCount: z.number(),
+      })
+    ),
+  })
+  .passthrough();
+
 export type GeminiContent = z.output<typeof geminiContentSchema>;
 
 export type GeminiEvent = z.output<typeof geminiEventSchema>;
@@ -99,3 +112,7 @@ export type GeminiEvent = z.output<typeof geminiEventSchema>;
 export type AskWithGeminiParams = z.output<typeof askWithGeminiParamsSchema>;
 
 export type AskWithGeminiBody = z.output<typeof askWithGeminiBodySchema>;
+
+export type GeminiCountTokensResponse = z.output<
+  typeof geminiCountTokensResponse
+>;
