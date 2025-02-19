@@ -5,6 +5,7 @@ import {
   WalletItem,
 } from "@aptos-labs/wallet-adapter-react";
 import { Network } from "@aptos-labs/ts-sdk";
+import type { AskWithGeminiBody } from "../ai/gemini";
 
 function App() {
   return (
@@ -92,6 +93,27 @@ function Home() {
               {account !== null && <LogoutPanel />}
             </>
           )}
+          <button
+            onClick={async () => {
+              const response = await fetch("/ask", {
+                method: "POST",
+                body: JSON.stringify({
+                  contents: [
+                    { role: "user", parts: [{ text: "Hi! How are you?" }] },
+                  ],
+                } satisfies AskWithGeminiBody),
+              });
+
+              // @ts-expect-error - This is a valid async generator function
+              for await (const event of response.body.pipeThrough(
+                new TextDecoderStream("utf-8", { fatal: true })
+              )) {
+                console.log(event);
+              }
+            }}
+          >
+            fun
+          </button>
         </div>
       </div>
       <div className="p-4">

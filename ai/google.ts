@@ -1,107 +1,13 @@
-import { GoogleAuth } from "google-auth-library";
-import { z } from "zod";
 import { zodToVertexSchema } from "@techery/zod-to-vertex-schema";
 import { createParser } from "eventsource-parser";
+import { GoogleAuth } from "google-auth-library";
+import { z } from "zod";
+import type { AskWithGeminiParams, GeminiEvent } from "./gemini";
 
-type Model = "gemini-1.5-flash" | "gemini-2.0-flash";
-
-const auth = new GoogleAuth({
+export const auth = new GoogleAuth({
   scopes: "https://www.googleapis.com/auth/cloud-platform",
   keyFile: "./service_account.json",
 });
-
-type GeminiContent = { role: "user" | "model"; parts: { text: string }[] };
-export type GeminiEvent = {
-  candidates:
-    | []
-    | [
-        {
-          content: GeminiContent;
-          finishReason?: "STOP";
-        },
-      ];
-  usageMetadata?: {
-    promptTokenCount: number;
-    candidatesTokenCount: number;
-    totalTokenCount: number;
-    promptTokensDetails: {
-      modality: "TEXT" | "IMAGE" | "AUDIO";
-      tokenCount: number;
-    }[];
-    candidatesTokensDetails: {
-      modality: "TEXT" | "IMAGE" | "AUDIO";
-      tokenCount: number;
-    }[];
-    modelVersion: string;
-    createTime: string;
-    responseId: string;
-  };
-};
-
-export interface AskWithGeminiBody {
-  contents: GeminiContent[];
-  systemInstruction?: {
-    role: "system";
-    parts: { text: string }[];
-  };
-  tools?: (
-    | {
-        functionDeclarations?: {
-          name: string;
-          description: string;
-          parameters: z.Schema | ReturnType<typeof zodToVertexSchema>;
-        }[];
-        googleSearchRetrieval?: never;
-        googleSearch?: never;
-      }
-    | {
-        googleSearchRetrieval?: {
-          mode: "MODE_UNSPECIFIED" | "MODE_DYNAMIC";
-          dynamicThreshold: number;
-        };
-        googleSearch?: never;
-        functionDeclarations?: never;
-      }
-    | {
-        googleSearch?: {};
-        googleSearchRetrieval?: never;
-        functionDeclarations?: never;
-      }
-  )[];
-  toolConfig?: {
-    functionCallingConfig?: {
-      mode: "AUTO" | "ANY" | "NONE";
-      allowedFunctionNames: string[];
-    };
-  };
-  generationConfig?: {
-    temperature?: number;
-    topP?: number;
-    topK?: number;
-    candidateCount?: 1;
-    maxOutputTokens?: number;
-    presencePenalty?: number;
-    frequencyPenalty?: number;
-    stopSequences?: string[];
-    seed?: number;
-  } & (
-    | {
-        responseMimeType: "application/json";
-        responseSchema: z.Schema | ReturnType<typeof zodToVertexSchema>;
-      }
-    | {
-        responseMimeType?: "text/plain";
-        responseSchema?: never;
-      }
-  );
-}
-
-interface AskWithGeminiParams {
-  location: "us-central1";
-  projectId: string;
-  model: Model;
-  body: AskWithGeminiBody;
-}
 
 export async function* askWithGemini(params: AskWithGeminiParams) {
   const apiKey = await auth.getAccessToken();
@@ -116,7 +22,7 @@ export async function* askWithGemini(params: AskWithGeminiParams) {
     body.generationConfig.responseSchema instanceof z.Schema
   ) {
     body.generationConfig.responseSchema = zodToVertexSchema(
-      body.generationConfig.responseSchema,
+      body.generationConfig.responseSchema
     );
   }
 
@@ -124,7 +30,7 @@ export async function* askWithGemini(params: AskWithGeminiParams) {
     for (const functionDeclaration of tool.functionDeclarations ?? []) {
       if (functionDeclaration.parameters instanceof z.Schema) {
         functionDeclaration.parameters = zodToVertexSchema(
-          functionDeclaration.parameters,
+          functionDeclaration.parameters
         );
       }
     }
@@ -138,7 +44,7 @@ export async function* askWithGemini(params: AskWithGeminiParams) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(body),
-    },
+    }
   );
 
   if (response.body === null) {
@@ -146,7 +52,7 @@ export async function* askWithGemini(params: AskWithGeminiParams) {
   }
 
   const stream = response.body.pipeThrough(
-    new TextDecoderStream("utf-8", { fatal: true }),
+    new TextDecoderStream("utf-8", { fatal: true })
   );
 
   const readable = new ReadableStream<GeminiEvent>({
@@ -157,7 +63,7 @@ export async function* askWithGemini(params: AskWithGeminiParams) {
         },
       });
 
-      // @ts-expect-error
+      // @ts-expect-error - This is a valid async generator function
       for await (const chunk of stream) {
         parser.feed(chunk);
       }
@@ -166,7 +72,7 @@ export async function* askWithGemini(params: AskWithGeminiParams) {
     },
   });
 
-  // @ts-expect-error
+  // @ts-expect-error - This is a valid async generator function
   for await (const chunk of readable) {
     const event = chunk as GeminiEvent;
 
@@ -185,7 +91,7 @@ const countTokenResponse = z.object({
     z.object({
       modality: z.enum(["TEXT", "IMAGE"]),
       tokenCount: z.number(),
-    }),
+    })
   ),
 });
 
@@ -203,7 +109,7 @@ export async function countTokens(params: AskWithGeminiParams) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(params.body),
-    },
+    }
   );
 
   const text = await response.text();
@@ -212,7 +118,7 @@ export async function countTokens(params: AskWithGeminiParams) {
 }
 
 export async function readAll(
-  response: AsyncGenerator<GeminiEvent, void, unknown>,
+  response: AsyncGenerator<GeminiEvent, void, unknown>
 ) {
   let content = "";
   for await (const chunk of response) {
@@ -227,7 +133,7 @@ export async function readAll(
 
 export async function readAllAndValidate<TSchema extends z.ZodTypeAny>(
   response: AsyncGenerator<GeminiEvent, void, unknown>,
-  schema: TSchema,
+  schema: TSchema
 ): Promise<z.infer<TSchema>> {
   const content = await readAll(response);
   return schema.parse(JSON.parse(content));
@@ -267,5 +173,6 @@ if (import.meta.main) {
       contents: [{ role: "user", parts: [{ text: "Hi! How are you?" }] }],
     },
   });
+
   console.info(tokens.totalTokens);
 }

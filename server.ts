@@ -2,10 +2,10 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 import type { ServeOptions } from "bun";
 import {
-    IncomingMessage,
-    type OutgoingHttpHeader,
-    type OutgoingHttpHeaders,
-    ServerResponse,
+  IncomingMessage,
+  type OutgoingHttpHeader,
+  type OutgoingHttpHeaders,
+  ServerResponse,
 } from "node:http";
 import path from "node:path";
 import process from "node:process";
@@ -284,6 +284,7 @@ Bun.serve({
   idleTimeout: 255,
   reusePort: true,
   ...(runtime.type === "prod" ? { static: runtime.static } : {}),
+  development: runtime.type === "dev",
   fetch: async (req) => {
     try {
       const url = new URL(req.url);
