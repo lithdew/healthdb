@@ -40,7 +40,7 @@ const config = new AptosConfig({
     provider: fetchClient,
   },
   clientConfig: {
-    API_KEY: process.env.APTOS_API_KEY_TESTNET,
+    API_KEY: process.env.VITE_APTOS_API_KEY_TESTNET,
   },
 });
 
