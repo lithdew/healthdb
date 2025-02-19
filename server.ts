@@ -249,6 +249,8 @@ if (process.env.NODE_ENV !== "production") {
     build[pathname] = new Response(await file.bytes(), {
       headers: {
         "Content-Type": file.type,
+        "Cross-Origin-Embedder-Policy": "require-corp",
+        "Cross-Origin-Opener-Policy": "same-origin",
       },
     });
   }
