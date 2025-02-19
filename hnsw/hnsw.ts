@@ -108,18 +108,20 @@ export class HNSW {
     this.entrypointId = -1;
     this.nodes = new Map();
     this.probs = this.setProbabilities(this.M, 1 / Math.log(this.M)); // M / log10(M)
-    this.levelMax = this.probs.length;
+    this.levelMax = this.probs.length - 1;
   }
 
   private setProbabilities(M: number, levelMult: number) {
     let level = 0;
+
     const probs = [];
     while (true) {
-      const prob =
-        Math.exp(-level / levelMult) * (1 - Math.exp(-1 / levelMult));
-      if (prob < 1e-9) break;
+      const p = Math.exp(-level / levelMult) * (1 - Math.exp(-1 / levelMult));
+      if (p < 1e-9) {
+        break;
+      }
 
-      probs.push(prob);
+      probs.push(p);
       level++;
     }
     return probs;
@@ -128,9 +130,9 @@ export class HNSW {
   // Weighted random selection of level.
   private selectLevel() {
     let r = Math.random();
-    for (const [i, p] of this.probs.entries()) {
+    for (const p of this.probs) {
       if (r < p) {
-        return i;
+        continue;
       }
       r -= p;
     }
@@ -151,12 +153,12 @@ export class HNSW {
         let next = null;
         let max = -Infinity;
 
-        for (const neighborId of node.neighbors[level]) {
+        for (const neighborId of current.neighbors[level]) {
           if (neighborId === -1) break;
 
           const neighbor = this.nodes.get(neighborId)!;
-          const similarity = this.metric(node.vector, neighbor.vector);
 
+          const similarity = this.metric(node.vector, neighbor.vector);
           if (similarity > max) {
             max = similarity;
             next = neighbor;
@@ -171,8 +173,7 @@ export class HNSW {
           break;
         }
 
-        current = next;
-        closest = current;
+        closest = current = next;
       }
     }
 
@@ -182,7 +183,6 @@ export class HNSW {
         (id) => id !== -1
       );
       closest.neighbors[level].push(node.id);
-
       if (closest.neighbors[level].length > this.M) {
         closest.neighbors[level].pop();
       }
@@ -222,55 +222,53 @@ export class HNSW {
     const results: { id: number; similarity: number }[] = [];
     const visited = new Set<number>();
 
-    const candidates = new LemirePriorityQueue<number>(
-      (a, b) => {
-        const nodeA = this.nodes.get(a)!;
-        const nodeB = this.nodes.get(b)!;
-        return this.metric(query, nodeB.vector) > this.metric(query, nodeA.vector);
-      }
-    );
+    const candidates = new LemirePriorityQueue<number>((a, b) => {
+      const nodeA = this.nodes.get(a)!;
+      const nodeB = this.nodes.get(b)!;
+      return (
+        this.metric(query, nodeB.vector) > this.metric(query, nodeA.vector)
+      );
+    });
 
     candidates.push(this.entrypointId);
-    
+
     let level = this.levelMax;
 
     while (results.length < k) {
-        const currentId = candidates.pop();
-        if (currentId === undefined) {
-            break;
+      const currentId = candidates.pop();
+      if (currentId === undefined) {
+        break;
+      }
+
+      if (visited.has(currentId)) {
+        continue;
+      }
+
+      visited.add(currentId);
+
+      const current = this.nodes.get(currentId)!;
+      const similarity = this.metric(query, current.vector);
+
+      if (similarity > 0) {
+        results.push({ id: currentId, similarity });
+      }
+
+      if (current.level === 0) {
+        continue;
+      }
+
+      level = Math.min(level, current.level - 1);
+
+      for (let i = level; i >= 0; i--) {
+        const neighbors = current.neighbors[i];
+        for (const neighborId of neighbors) {
+          if (!visited.has(neighborId)) {
+            candidates.push(neighborId);
+          }
         }
-
-        if (visited.has(currentId)) {
-            continue;
-        }
-
-        visited.add(currentId);
-
-        const current = this.nodes.get(currentId)!;
-        const similarity = this.metric(query, current.vector);
-
-        if (similarity > 0) {
-            results.push({ id: currentId, similarity });
-        }
-
-        if (current.level === 0) {
-            continue;
-        }
-
-        level = Math.min(level, current.level - 1);
-
-        for (let i = level; i >= 0; i--) {
-            const neighbors = current.neighbors[i];
-            for (const neighborId of neighbors) {
-               if (!visited.has(neighborId)) {
-                candidates.push(neighborId);
-               }
-            }
-        }
+      }
     }
 
     return results.slice(0, k);
   }
-
-  
 }
