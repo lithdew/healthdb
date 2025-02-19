@@ -339,9 +339,9 @@ export const createMemoryStore = async () => {
   return memory;
 };
 
-if (import.meta.env) {
-  const embedder = new Embedder();
-  const vector = new HNSWVectorStore("hnsw-db", 384);
-  const db = await initializeSQLite();
-  const memory = new MemoryStore({ vector, db, embedder });
-}
+// if (import.meta.env) {
+//   const embedder = new Embedder();
+//   const vector = new HNSWVectorStore("hnsw-db", 384);
+//   const db = await initializeSQLite();
+//   const memory = new MemoryStore({ vector, db, embedder });
+// }

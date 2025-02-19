@@ -2,7 +2,7 @@ import sqlite3InitModule, {
   Database,
   type Sqlite3Static,
 } from "@sqlite.org/sqlite-wasm";
-import { schema } from "./schema";
+import { migrations } from "./migrations";
 
 let db: Database | null = null;
 
@@ -24,11 +24,43 @@ export const initializeSQLite = async () => {
     });
     console.info("Done initializing. Running demo...");
     db = createDbConn(sqlite3);
-    db.exec(schema);
-    console.info("migration complete");
+
+    migrate(db);
     return db;
   } catch (err) {
     console.error("Initialization error:", err);
     throw err;
   }
+};
+
+const getVersion = (db: Database) => {
+  const result = db.exec("PRAGMA user_version", {
+    returnValue: "resultRows",
+    rowMode: "object",
+  });
+
+  const version = result[0]?.user_version;
+  return version as number;
+};
+
+const updateVersion = (db: Database, version: number) => {
+  db.exec(`PRAGMA user_version = ${version}`);
+};
+
+const migrate = (db: Database) => {
+  const currentVersion = getVersion(db);
+
+  for (const migration of migrations) {
+    if (currentVersion < migration.version) {
+      console.info({ currentVersion });
+      console.info("migrating");
+      db.transaction((db) => {
+        db.exec(migration.migration);
+        updateVersion(db, migration.version + 1);
+      });
+    }
+  }
+
+  console.info(getVersion(db));
+  console.info("migration complete");
 };
