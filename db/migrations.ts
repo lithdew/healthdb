@@ -1,6 +1,6 @@
 export const migrations = [
   {
-    version: 0,
+    version: 1,
     migration: `
 create table if not exists measurements (
     id serial primary key,
@@ -23,8 +23,6 @@ create table if not exists memories (
     created_at real not null,
     updated_at real
 );
-
-PRAGMA user_version = 1;
 `,
   },
 ];

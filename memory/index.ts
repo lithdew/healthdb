@@ -11,7 +11,7 @@ import { getRetrieveFactsPrompt, getUpdateMemoryPrompt } from "../ai/functions";
 import { HNSWVectorStore } from "./vector";
 import type { AskWithGeminiBody, GeminiEvent } from "../ai/google";
 import { createParser } from "eventsource-parser";
-import { initializeSQLite } from "../db";
+import { db, initializeSQLite } from "../db";
 
 export interface Memory {
   id: number;
@@ -335,7 +335,7 @@ export const createMemoryStore = async () => {
   const embedder = new Embedder();
   const vector = new HNSWVectorStore("hnsw-db", 384);
   const db = await initializeSQLite();
-  const memory = new MemoryStore({ vector, db, embedder });
+  const memory = new MemoryStore({ vector, db: db!, embedder });
   return memory;
 };
 

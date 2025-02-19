@@ -4,7 +4,7 @@ import sqlite3InitModule, {
 } from "@sqlite.org/sqlite-wasm";
 import { migrations } from "./migrations";
 
-let db: Database | null = null;
+export let db: Database | null = null;
 
 const createDbConn = (sqlite3: Sqlite3Static) => {
   console.info("Running SQLite3 version", sqlite3.version.libVersion);
@@ -22,7 +22,7 @@ export const initializeSQLite = async () => {
       print: console.info,
       printErr: console.error,
     });
-    console.info("Done initializing. Running demo...");
+    console.info("Done initializing. ");
     db = createDbConn(sqlite3);
 
     migrate(db);
@@ -50,9 +50,9 @@ const updateVersion = (db: Database, version: number) => {
 const migrate = (db: Database) => {
   const currentVersion = getVersion(db);
 
+  console.info(`migration start: ${currentVersion}`);
   for (const migration of migrations) {
     if (currentVersion < migration.version) {
-      console.info({ currentVersion });
       console.info("migrating");
       db.transaction((db) => {
         db.exec(migration.migration);
@@ -61,6 +61,6 @@ const migrate = (db: Database) => {
     }
   }
 
-  console.info(getVersion(db));
   console.info("migration complete");
+  console.info(`current version: ${getVersion(db)}`);
 };

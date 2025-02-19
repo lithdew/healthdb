@@ -1,6 +1,6 @@
+import { defineConfig } from "vite";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react-swc";
-import { defineConfig } from "vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 // https://vite.dev/config/
@@ -26,13 +26,6 @@ export default defineConfig({
       },
     },
   ],
-  server: {
-    host: true,
-    headers: {
-      "Cross-Origin-Opener-Policy": "same-origin",
-      "Cross-Origin-Embedder-Policy": "require-corp",
-    },
-  },
   optimizeDeps: {
     exclude: ["@sqlite.org/sqlite-wasm"],
   },
