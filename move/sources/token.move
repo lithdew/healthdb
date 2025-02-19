@@ -16,6 +16,12 @@ module healthdb::token {
     use std::option;
 
     #[test_only]
+    use std::debug;
+
+    #[test_only]
+    use aptos_std::type_info;
+
+    #[test_only]
     use aptos_std::ed25519;
 
     // Unauthorized. Only executable by admin.
@@ -225,6 +231,12 @@ module healthdb::token {
         assert!(receipt.body.from == signer::address_of(&user));
         assert!(receipt.body.to == signer::address_of(admin));
         assert!(receipt.body.amount == 10_000_000_000);
+    }
+
+    #[test]
+    fun test_receipt_body_type_info() {
+        let type_info = type_info::type_of<ReceiptBody>();
+        debug::print(&type_info);
     }
 
     #[test(admin = @healthdb)]

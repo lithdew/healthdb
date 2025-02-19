@@ -1,11 +1,4 @@
-import { FixedBytes, MoveVector, U64 } from "@aptos-labs/ts-sdk";
-import type {
-  AskWithGeminiBody,
-  GeminiCountTokensResponse,
-  GeminiEvent,
-} from "../ai/gemini";
-import { aptos } from "../move/aptos";
-import { useState } from "react";
+import { FixedBytes, MoveString, Serializer, U64 } from "@aptos-labs/ts-sdk";
 import {
   keepPreviousData,
   QueryClient,
@@ -13,13 +6,21 @@ import {
   useQuery,
 } from "@tanstack/react-query";
 import { Decimal } from "decimal.js";
+import { useState } from "react";
+import type {
+  AskWithGeminiBody,
+  GeminiCountTokensResponse,
+  GeminiEvent,
+} from "../ai/gemini";
+import { ABI } from "../move/abi";
+import { aptos } from "../move/aptos";
 import {
-  GlobalStoreProvider,
-  useGlobals,
-  useGlobalStore,
-  useMemoryStore,
-} from "./store";
-import { MessageList } from "./components/message-list";
+  HEALTH_AI_AGENT_CREATOR_ADDRESS,
+  HEALTH_TOKEN_ADDRESS,
+} from "./globals";
+import { GlobalStoreProvider, useGlobalStore, useMemoryStore } from "./store";
+
+import { useGlobals } from "./store";
 
 function App() {
   const [queryClient] = useState(new QueryClient());
@@ -56,8 +57,7 @@ function LogoutPanel() {
 
       for (const balance of response) {
         if (
-          balance.asset_type ===
-            "0x9a4758eb352e8cdce198f65346adbc05a9bf1d60085757b64d835f8d141209a5" &&
+          balance.asset_type === HEALTH_TOKEN_ADDRESS &&
           balance.amount !== undefined
         ) {
           return BigInt(balance.amount);
@@ -75,6 +75,9 @@ function LogoutPanel() {
     <>
       <div>
         <span>You are logged in as: {account.accountAddress.toString()}</span>
+      </div>
+      <div>
+        <span>Your Ed25519 public key is: {account.publicKey.toString()}</span>
       </div>
       <div>
         {!query.isLoading && <span>You have {query.data} HEALTH token(s)</span>}
@@ -124,7 +127,7 @@ function Home() {
 
               // @ts-expect-error - This is a valid async generator function
               for await (const event of response.body.pipeThrough(
-                new TextDecoderStream("utf-8", { fatal: true }),
+                new TextDecoderStream("utf-8", { fatal: true })
               )) {
                 console.log(event);
               }
@@ -153,7 +156,7 @@ function Home() {
             className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
             onClick={async () => {
               await store.askAndSaveToMemory(
-                "I drank too much hot chocolate, now my blood sugar is feeling high, i feel sick",
+                "I drank too much hot chocolate, now my blood sugar is feeling high, i feel sick"
               );
             }}
           >
@@ -190,19 +193,22 @@ function Home() {
           <button
             className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
             onClick={async () => {
-              const message = new MoveVector([
-                new FixedBytes("0x1234"),
-                new FixedBytes("0x5678"),
-                new U64(10_000_000_000),
-              ]);
+              const serializer = new Serializer();
+              new FixedBytes(ABI.address).serialize(serializer);
+              new MoveString("token").serialize(serializer);
+              new MoveString("ReceiptBody").serialize(serializer);
+              account.accountAddress.serialize(serializer);
+              new FixedBytes(HEALTH_AI_AGENT_CREATOR_ADDRESS).serialize(
+                serializer
+              );
+              new U64(10_000_000_000n).serialize(serializer);
 
-              const signature = account.sign(message.bcsToBytes());
+              const signature = account.sign(serializer.toUint8Array());
               console.log(signature.toString());
             }}
           >
             sign message
           </button>
-          <MessageList />
         </div>
       </div>
       <div className="p-4">

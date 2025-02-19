@@ -3,7 +3,7 @@ import { askWithGemini } from "../ai/gemini.client";
 import { zodToVertexSchema } from "@techery/zod-to-vertex-schema";
 import { z } from "zod";
 import { getSummarizeConversationPrompt } from "../ai/functions";
-import { readAllAndValidate } from "../ai/google";
+import { readAllAndValidate } from "../ai/gemini.client";
 
 export class MCTSNode {
   parent: MCTSNode | null;
@@ -34,13 +34,13 @@ export class MCTSNode {
 
   selectChild(): MCTSNode {
     return this.children.reduce((best, child) =>
-      child.ucb1() > best.ucb1() ? child : best,
+      child.ucb1() > best.ucb1() ? child : best
     );
   }
 
   expand(candidateResponses: string[]): MCTSNode[] {
     this.children = candidateResponses.map(
-      (response) => new MCTSNode([...this.conversationState, response], this),
+      (response) => new MCTSNode([...this.conversationState, response], this)
     );
     return this.children;
   }
@@ -65,7 +65,7 @@ export class MCTSNode {
 
 export function generateAIResponse(
   conversationHistory: string[],
-  currentMessage: string,
+  currentMessage: string
 ) {
   return {
     body: {
@@ -113,7 +113,7 @@ export function generateAIResponse(
 
 export function generateUserResponse(
   conversationHistory: string[],
-  currentMessage: string,
+  currentMessage: string
 ) {
   return {
     body: {
@@ -215,7 +215,9 @@ Now, given the following conversation response, please generate a score between 
           role: "user" as const,
           parts: [
             {
-              text: `<current-conversation>${conversationHistory.join("\n")}</current-conversation>`,
+              text: `<current-conversation>${conversationHistory.join(
+                "\n"
+              )}</current-conversation>`,
             },
           ],
         },
@@ -244,7 +246,7 @@ export async function mctsSearch(root: MCTSNode, iterations: number = 10) {
 
       if (node.conversationState.length > 2) {
         const summarizedConversation = askWithGemini(
-          getSummarizeConversationPrompt(node.conversationState).body,
+          getSummarizeConversationPrompt(node.conversationState).body
         );
 
         let summary = "";

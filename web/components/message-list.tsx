@@ -1,6 +1,4 @@
-import { useGlobalStore } from "../store";
-
-export const MessageList = () => {
-  const messages = useGlobalStore((store) => store.messages);
-  return messages.map((message, index) => {});
-};
+// export const MessageList = () => {
+//   const messages = useGlobalStore((store) => store.messages);
+//   return messages.map((message, index) => {});
+// };
