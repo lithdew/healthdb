@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { askWithGeminiBodySchema } from "./ai/gemini";
+import {
+  askWithGeminiBodySchema,
+  type AskWithGeminiBody,
+  type AskWithGeminiParams,
+} from "./ai/gemini";
 import { askWithGemini, countTokens } from "./ai/google";
 import { Database } from "bun:sqlite";
 import { outdent } from "outdent";
@@ -85,28 +89,7 @@ export default async function handler({
       });
     }
 
-    const key = stringify(result.data);
-    const cached = db
-      .query<{ value: string }, [string]>(
-        "select value from token_count_cache where key = ?"
-      )
-      .get(key);
-    if (cached !== null) {
-      return new Response(cached.value, {
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    const response = await countTokens({
-      location: "us-central1",
-      projectId: "lithdew",
-      model: result.data.model,
-      body: result.data,
-    });
-
-    db.query(
-      "insert or replace into token_count_cache (key, value) values (?, ?)"
-    ).run(key, JSON.stringify(response));
+    const response = await getTokenCount(result.data.model, result.data);
 
     return Response.json(response, {
       headers: { "Content-Type": "application/json" },
@@ -114,4 +97,32 @@ export default async function handler({
   }
 
   return undefined;
+}
+
+async function getTokenCount(
+  model: AskWithGeminiParams["model"],
+  body: AskWithGeminiBody
+) {
+  const key = stringify(body);
+  const cached = db
+    .query<{ value: string }, [string]>(
+      "select value from token_count_cache where key = ?"
+    )
+    .get(key);
+  if (cached !== null) {
+    return JSON.parse(cached.value);
+  }
+
+  const response = await countTokens({
+    location: "us-central1",
+    projectId: "lithdew",
+    model,
+    body,
+  });
+
+  db.query(
+    "insert or replace into token_count_cache (key, value) values (?, ?)"
+  ).run(key, JSON.stringify(response));
+
+  return response;
 }
