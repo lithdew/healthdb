@@ -10,7 +10,10 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "@aptos-labs/ts-sdk": "^1.35.0",
+    "@aptos-labs/wallet-adapter-react": "^3.8.0",
     "@techery/zod-to-vertex-schema": "^0.1.4",
+    "@thalalabs/surf": "^1.8.1",
     "eventsource-parser": "^3.0.0",
     "fastpriorityqueue": "^0.7.5",
     "google-auth-library": "^9.15.1",
