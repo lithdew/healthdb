@@ -96,6 +96,7 @@ function LogoutPanel() {
 
 function Home() {
   const { account, isLoading, ...rest } = useWallet();
+  const [memory] = useMemoryStore();
   return (
     <div className="h-dvh w-full bg-gray-50 flex flex-col">
       <div className="p-4 grow">
@@ -130,6 +131,14 @@ function Home() {
             }}
           >
             stream example prompt
+          </button>
+          <button
+            className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
+            onClick={async () => {
+              memory?.add("hello i love chocolate");
+            }}
+          >
+            add memory example
           </button>
           <button
             className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"

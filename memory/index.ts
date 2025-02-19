@@ -70,6 +70,7 @@ export class MemoryStore {
 
         // @ts-expect-error
         for await (const chunk of stream) {
+          console.info(chunk);
           parser.feed(chunk);
         }
 
