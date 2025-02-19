@@ -10,18 +10,21 @@ import { ABI } from "./abi";
 async function fetchClient<Req>(requestOptions: ClientRequest<Req>) {
   const { params, method, url, headers, body } = requestOptions;
 
-  const request = {
-    headers,
-    body: JSON.stringify(body),
-    method,
-  };
-
   let path = url;
   if (params !== null || params !== undefined) {
     path = `${url}?${params}`;
   }
 
-  const response = await fetch(path, request);
+  const request = new Request(path, {
+    method,
+    headers,
+    body:
+      headers?.["content-type"] === "application/x.aptos.signed_transaction+bcs"
+        ? (body as BodyInit)
+        : JSON.stringify(body),
+  });
+
+  const response = await fetch(request);
   const data = await response.json();
 
   return {
@@ -37,7 +40,8 @@ async function fetchClient<Req>(requestOptions: ClientRequest<Req>) {
 const config = new AptosConfig({
   network: Network.TESTNET,
   client: {
-    provider: fetchClient,
+    provider: (opts) => fetchClient(opts),
+    binaryProvider: (opts) => fetchClient(opts),
   },
   clientConfig: {
     API_KEY: process.env.VITE_APTOS_API_KEY_TESTNET,

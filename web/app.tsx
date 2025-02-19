@@ -6,8 +6,13 @@ import type {
 import { GlobalStoreProvider, useGlobalStore, useMemoryStore } from "./store";
 import { aptos } from "../move/aptos";
 import { useState } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-
+import {
+  keepPreviousData,
+  QueryClient,
+  QueryClientProvider,
+  useQuery,
+} from "@tanstack/react-query";
+import { Decimal } from "decimal.js";
 function App() {
   const [queryClient] = useState(new QueryClient());
   return (
@@ -19,13 +24,55 @@ function App() {
   );
 }
 
+const tokenFormatter = new Intl.NumberFormat("en-US", {
+  style: "decimal",
+  maximumFractionDigits: 9,
+  minimumFractionDigits: 2,
+});
+
 function LogoutPanel() {
   const account = useGlobalStore((state) => state.account);
+
+  const query = useQuery({
+    queryKey: ["coins"],
+    queryFn: async () => {
+      const response = await aptos.getCurrentFungibleAssetBalances({
+        options: {
+          where: {
+            owner_address: {
+              _eq: account.accountAddress.toString(),
+            },
+          },
+        },
+      });
+
+      for (const balance of response) {
+        if (
+          balance.asset_type ===
+            "0x9a4758eb352e8cdce198f65346adbc05a9bf1d60085757b64d835f8d141209a5" &&
+          balance.amount !== undefined
+        ) {
+          return BigInt(balance.amount);
+        }
+      }
+
+      return 0n;
+    },
+    placeholderData: keepPreviousData,
+    select: (data) =>
+      tokenFormatter.format(new Decimal(data.toString()).div(1e9).toNumber()),
+  });
 
   return (
     <>
       <div>
         <span>You are logged in as: {account.accountAddress.toString()}</span>
+      </div>
+      <div>
+        {!query.isLoading && (
+          <span>You have {query.data} HEALTH token(s)</span>
+        )}
+        {query.isLoading && <span>Loading...</span>}
       </div>
       <div>
         <a
