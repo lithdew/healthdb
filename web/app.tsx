@@ -15,9 +15,15 @@ import type {
   AskWithGeminiBody,
   GeminiCountTokensResponse,
 } from "../ai/gemini";
-import { createParser } from "eventsource-parser";
+import React from "react";
+import { useMemoryStore } from "./src/lib/memory";
 
 function App() {
+  const [memory, isLoaded] = useMemoryStore();
+  React.useEffect(() => {
+    console.info({ memory, isLoaded });
+  }, [memory, isLoaded]);
+
   return (
     <AptosWalletAdapterProvider
       autoConnect
@@ -115,24 +121,11 @@ function Home() {
                 } satisfies AskWithGeminiBody),
               });
 
-              if (response.body === null) {
-                throw new Error("No body");
-              }
-
-              const stream = response.body.pipeThrough(
-                new TextDecoderStream("utf-8", { fatal: true })
-              );
-
-              const parser = createParser({
-                onEvent(event) {
-                  const data = JSON.parse(event.data);
-                  console.log(data);
-                },
-              });
-
               // @ts-expect-error - This is a valid async generator function
-              for await (const event of stream) {
-                parser.feed(event);
+              for await (const event of response.body.pipeThrough(
+                new TextDecoderStream("utf-8", { fatal: true }),
+              )) {
+                console.log(event);
               }
             }}
           >

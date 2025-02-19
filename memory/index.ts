@@ -331,6 +331,14 @@ export class MemoryStore {
   }
 }
 
+export const createMemoryStore = async () => {
+  const embedder = new Embedder();
+  const vector = new HNSWVectorStore("hnsw-db", 384);
+  const db = await initializeSQLite();
+  const memory = new MemoryStore({ vector, db, embedder });
+  return memory;
+};
+
 if (import.meta.env) {
   const embedder = new Embedder();
   const vector = new HNSWVectorStore("hnsw-db", 384);

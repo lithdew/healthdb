@@ -1,4 +1,5 @@
-import { pipeline } from "@xenova/transformers";
+import { pipeline, env } from "@xenova/transformers";
+env.allowLocalModels = false;
 
 const pipePromise = pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
 
@@ -15,10 +16,4 @@ export class Embedder {
       }),
     );
   }
-}
-
-if (import.meta.env) {
-  const embedder = new Embedder();
-  const embeddings = await embedder.embed(["Hello, i love chocolates"]);
-  console.info(embeddings);
 }
