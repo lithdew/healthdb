@@ -43,7 +43,7 @@ module healthdb::token {
             utf8(b"HealthDB"),
             utf8(SYMBOL),
             9,
-            utf8(b"https://   "),
+            utf8(b"https://raw.githubusercontent.com/lithdew/healthdb/refs/heads/main/assets/logo.svg"),
             utf8(b"https://github.com/lithdew/healthdb"),
         );
 
