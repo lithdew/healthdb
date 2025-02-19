@@ -21,6 +21,8 @@ import {
 import { GlobalStoreProvider, useGlobalStore, useMemoryStore } from "./store";
 
 import { useGlobals } from "./store";
+import { outdent } from "outdent";
+import Markdown from "react-markdown";
 
 function App() {
   const [queryClient] = useState(new QueryClient());
@@ -96,16 +98,39 @@ function LogoutPanel() {
   );
 }
 
+function ResearchPanel() {
+  const nodeIds = useGlobalStore((state) => [...state.nodes.keys()]);
+
+  return (
+    <div>
+      {nodeIds.map((id) => (
+        <ResearchNodePanel key={id} nodeId={id} />
+      ))}
+    </div>
+  );
+}
+
+function ResearchNodePanel({ nodeId }: { nodeId: string }) {
+  const node = useGlobalStore((state) => state.nodes.get(nodeId));
+
+  if (node === undefined) {
+    return <div>Node {nodeId} not found</div>;
+  }
+
+  return (
+    <div>
+      <code>
+        {node.id} ({node.depth}) ({node.status})
+      </code>
+      <Markdown>{node.buffer}</Markdown>
+    </div>
+  );
+}
+
 function Home() {
   const account = useGlobalStore((state) => state.account);
   const memory = useMemoryStore();
   const store = useGlobals();
-
-  const [stream, setStream] = useState<AsyncGenerator<
-    GeminiEvent,
-    void,
-    unknown
-  > | null>(null);
 
   return (
     <div className="h-dvh w-full bg-gray-50 flex flex-col">
@@ -209,6 +234,32 @@ function Home() {
           >
             sign message
           </button>
+
+          <button
+            className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
+            onClick={async () => {
+              const PROMPT = outdent`
+                I have a heart pressure monitor. I did two readings. It's 1:05AM.
+
+                First reading: sys. 111, dia. 68, pulse 76.
+                Second reading: sys. 114, dia. 66, pulse 74.
+
+                Weight is 88kg. I am male. 27 years old.
+
+                Indicate to me if these readings indicate any potential health concerns and if there is anything I can or should do about it.
+
+                I run 5km every day or two. It takes me on average 34 minutes to complete a 5k.
+              `;
+
+              await store.research(PROMPT);
+            }}
+          >
+            do da research
+          </button>
+        </div>
+
+        <div>
+          <ResearchPanel />
         </div>
       </div>
       <div className="p-4">

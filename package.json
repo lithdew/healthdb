@@ -49,9 +49,9 @@
     "p-queue": "^8.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-markdown": "^9.0.3",
     "sonner": "^2.0.0",
     "superagent": "^10.1.1",
-    "react-markdown": "^9.0.3",
     "zod": "^3.24.2"
   }
 }
