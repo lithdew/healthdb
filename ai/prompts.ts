@@ -116,7 +116,7 @@ export const updateMemoryPrompt = ({
   oldMemory,
   newRetrievedFacts,
 }: {
-  oldMemory: { id: number; content: string }[];
+  oldMemory: { id: number; content: string; createdAt: string }[];
   newRetrievedFacts: string[];
 }) => ({
   system: `You are a smart memory manager which controls the memory of a system.
@@ -138,7 +138,7 @@ export const updateMemoryPrompt = ({
                 [
                     {{
                         "id" : 0,
-                        "text" : "User is a software engineer"
+                        "content" : "User is a software engineer",
                     }}
                 ]
             - Retrieved facts: ["Name is John"]
@@ -147,12 +147,12 @@ export const updateMemoryPrompt = ({
                     "memory" : [
                         {{
                             "id" : 0,
-                            "text" : "User is a software engineer",
+                            "content" : "User is a software engineer",
                             "action" : ${UpdateMemoryAction.NONE}
                         }},
                         {{
                             "id" : 1,
-                            "text" : "Name is John",
+                            "content" : "Name is John",
                             "action" : ${UpdateMemoryAction.ADD}
                         }}
                     ]
@@ -171,15 +171,15 @@ export const updateMemoryPrompt = ({
                 [
                     {{
                         "id" : 0,
-                        "text" : "I really like cheese pizza"
+                        "content" : "I really like cheese pizza"
                     }},
                     {{
                         "id" : 1,
-                        "text" : "User is a software engineer"
+                        "content" : "User is a software engineer"
                     }},
                     {{
                         "id" : 2,
-                        "text" : "User likes to play cricket"
+                        "content" : "User likes to play cricket"
                     }}
                 ]
             - Retrieved facts: ["Loves chicken pizza", "Loves to play cricket with friends"]
@@ -188,18 +188,18 @@ export const updateMemoryPrompt = ({
                 "memory" : [
                         {{
                             "id" : 0,
-                            "text" : "Loves cheese and chicken pizza",
+                            "content" : "Loves cheese and chicken pizza",
                             "action" : ${UpdateMemoryAction.UPDATE},
                             "old_memory" : "I really like cheese pizza"
                         }},
                         {{
                             "id" : 1,
-                            "text" : "User is a software engineer",
+                            "content" : "User is a software engineer",
                             "action" : ${UpdateMemoryAction.NONE}
                         }},
                         {{
                             "id" : 2,
-                            "text" : "Loves to play cricket with friends",
+                            "content" : "Loves to play cricket with friends",
                             "action" : ${UpdateMemoryAction.UPDATE},
                             "old_memory" : "User likes to play cricket"
                         }}
@@ -214,11 +214,11 @@ export const updateMemoryPrompt = ({
                 [
                     {{
                         "id" : 0,
-                        "text" : "Name is John"
+                        "content" : "Name is John"
                     }},
                     {{
                         "id" : 1,
-                        "text" : "Loves cheese pizza"
+                        "content" : "Loves cheese pizza"
                     }}
                 ]
             - Retrieved facts: ["Dislikes cheese pizza"]
@@ -227,12 +227,12 @@ export const updateMemoryPrompt = ({
                 "memory" : [
                         {{
                             "id" : 0,
-                            "text" : "Name is John",
+                            "content" : "Name is John",
                             "action" : ${UpdateMemoryAction.NONE}
                         }},
                         {{
                             "id" : 1,
-                            "text" : "Loves cheese pizza",
+                            "content" : "Loves cheese pizza",
                             "action" : ${UpdateMemoryAction.DELETE}
                         }}
                 ]
@@ -244,11 +244,11 @@ export const updateMemoryPrompt = ({
                 [
                     {{
                         "id" : 0,
-                        "text" : "Name is John"
+                        "content" : "Name is John"
                     }},
                     {{
                         "id" : 1,
-                        "text" : "Loves cheese pizza"
+                        "content" : "Loves cheese pizza"
                     }}
                 ]
             - Retrieved facts: ["Name is John"]
@@ -257,12 +257,12 @@ export const updateMemoryPrompt = ({
                 "memory" : [
                         {{
                             "id" : 0,
-                            "text" : "Name is John",
+                            "content" : "Name is John",
                             "action" : ${UpdateMemoryAction.NONE}
                         }},
                         {{
                             "id" : 1,
-                            "text" : "Loves cheese pizza",
+                            "content" : "Loves cheese pizza",
                             "action" : ${UpdateMemoryAction.NONE}
                         }}
                     ]
@@ -279,6 +279,9 @@ export const updateMemoryPrompt = ({
     <new-retrieved-facts>
     ${JSON.stringify(newRetrievedFacts)}
     </new-retrieved-facts>
+    <new-retrieved-facts-timestamp>
+    {DATE_NOW}
+    </new-retrieved-facts-timestamp>
 
     Follow the instruction mentioned below:
     - Do not return anything from the custom few shot prompts provided above.
@@ -287,6 +290,6 @@ export const updateMemoryPrompt = ({
     - If there is an addition, generate a new key and add the new memory corresponding to it.
     - If there is a deletion, the memory key-value pair should be removed from the memory.
     - If there is an update, the ID key should remain the same and only the value needs to be updated.
-
-    Do not return anything except the JSON format.`,
+    - Look at the date and see if the new retrieved facts are time specific. If not, then do not make any changes.
+    `,
 });

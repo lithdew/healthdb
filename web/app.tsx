@@ -2,8 +2,8 @@ import { FixedBytes, MoveVector, U64 } from "@aptos-labs/ts-sdk";
 import type {
   AskWithGeminiBody,
   GeminiCountTokensResponse,
+  GeminiEvent,
 } from "../ai/gemini";
-import { GlobalStoreProvider, useGlobalStore, useMemoryStore } from "./store";
 import { aptos } from "../move/aptos";
 import { useState } from "react";
 import {
@@ -13,6 +13,14 @@ import {
   useQuery,
 } from "@tanstack/react-query";
 import { Decimal } from "decimal.js";
+import {
+  GlobalStoreProvider,
+  useGlobals,
+  useGlobalStore,
+  useMemoryStore,
+} from "./store";
+import { MessageList } from "./components/message-list";
+
 function App() {
   const [queryClient] = useState(new QueryClient());
   return (
@@ -69,9 +77,7 @@ function LogoutPanel() {
         <span>You are logged in as: {account.accountAddress.toString()}</span>
       </div>
       <div>
-        {!query.isLoading && (
-          <span>You have {query.data} HEALTH token(s)</span>
-        )}
+        {!query.isLoading && <span>You have {query.data} HEALTH token(s)</span>}
         {query.isLoading && <span>Loading...</span>}
       </div>
       <div>
@@ -90,6 +96,13 @@ function LogoutPanel() {
 function Home() {
   const account = useGlobalStore((state) => state.account);
   const memory = useMemoryStore();
+  const store = useGlobals();
+
+  const [stream, setStream] = useState<AsyncGenerator<
+    GeminiEvent,
+    void,
+    unknown
+  > | null>(null);
 
   return (
     <div className="h-dvh w-full bg-gray-50 flex flex-col">
@@ -111,7 +124,7 @@ function Home() {
 
               // @ts-expect-error - This is a valid async generator function
               for await (const event of response.body.pipeThrough(
-                new TextDecoderStream("utf-8", { fatal: true })
+                new TextDecoderStream("utf-8", { fatal: true }),
               )) {
                 console.log(event);
               }
@@ -135,6 +148,25 @@ function Home() {
             }}
           >
             list memories
+          </button>
+          <button
+            className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
+            onClick={async () => {
+              await store.askAndSaveToMemory(
+                "I drank too much hot chocolate, now my blood sugar is feeling high, i feel sick",
+              );
+            }}
+          >
+            Test messageitem
+          </button>
+          <button
+            className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
+            onClick={async () => {
+              const results = await memory.search("hot chocolate");
+              console.info(results);
+            }}
+          >
+            Search for results
           </button>
           <button
             className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
@@ -170,6 +202,7 @@ function Home() {
           >
             sign message
           </button>
+          <MessageList />
         </div>
       </div>
       <div className="p-4">

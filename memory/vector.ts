@@ -59,13 +59,14 @@ export class HNSWVectorStore implements VectorStore {
 
   search(
     embedding: Embedding,
-    opts?: { threshold?: number; topK?: number }
+    opts?: { threshold?: number; topK?: number },
   ): EmbeddingResult[] {
-    const { threshold, topK = 10 } = opts ?? {};
+    const { threshold = 0.8, topK = 10 } = opts ?? {};
     if (this.hnsw.nodes.size === 0) {
       return [];
     }
     const nodes = this.hnsw.search(embedding, topK);
+    console.info(nodes);
     if (threshold !== undefined) {
       return nodes.filter((node) => node.similarity > threshold);
     }

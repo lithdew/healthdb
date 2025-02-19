@@ -9,6 +9,7 @@ import { Database } from "bun:sqlite";
 import { outdent } from "outdent";
 import stringify from "@solana/fast-stable-stringify";
 import { encode } from "eventsource-encoder";
+import PQueue from "p-queue";
 
 const db = new Database("db.sqlite", {
   strict: true,
@@ -26,6 +27,8 @@ db.exec(outdent`
     value text
   );
 `);
+
+const geminiPQueue = new PQueue({ interval: 60 * 1000, intervalCap: 99 });
 
 export default async function handler({
   req,
@@ -57,12 +60,18 @@ export default async function handler({
     return new Response(
       // @ts-expect-error - This is a valid async generator function
       async function* () {
-        for await (const event of askWithGemini({
-          location: "us-central1",
-          projectId: "lithdew",
-          model: result.data.model,
-          body: result.data,
-        })) {
+        const stream = await geminiPQueue.add(
+          async () => {
+            return askWithGemini({
+              location: "us-central1",
+              projectId: "lithdew",
+              model: result.data.model,
+              body: result.data,
+            });
+          },
+          { throwOnTimeout: false as true },
+        );
+        for await (const event of stream) {
           yield encode({ data: JSON.stringify(event) });
         }
       },

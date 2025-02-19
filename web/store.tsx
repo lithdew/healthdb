@@ -7,9 +7,13 @@ import { HNSWVectorStore } from "../memory/vector";
 import { MemoryStore } from "../memory";
 import { Embedder } from "../memory/embedder";
 import { AccountUtils, Ed25519Account } from "@aptos-labs/ts-sdk";
+import { askWithGemini, readAll } from "../ai/gemini.client";
+import { generateUserResponse, MCTSNode, mctsSearch } from "./mcts";
 
 interface State {
   account: Ed25519Account;
+  hello: "world";
+  messages: { completed: boolean; value: string }[];
 }
 
 export class GlobalStore {
@@ -30,13 +34,13 @@ export class GlobalStore {
       account = Ed25519Account.generate();
       window.localStorage.setItem(
         "healthdb_keys",
-        AccountUtils.toHexString(account)
+        AccountUtils.toHexString(account),
       );
     } else {
       account = AccountUtils.ed25519AccountFromHex(encoded);
     }
 
-    this.state = new Store({ account });
+    this.state = new Store<State>({ account, hello: "world", messages: [] });
 
     this.db = new Dexie("my-db") as Dexie & DexieSchema;
     this.db.version(1).stores({
@@ -55,6 +59,35 @@ export class GlobalStore {
       db: this.db,
       embedder: this.embedder,
     });
+  }
+
+  async askAndSaveToMemory(question: string) {
+    void this.memory.add(question);
+
+    return askWithGemini({
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: question }],
+        },
+      ],
+    });
+  }
+
+  async runMCTS(question: string) {
+    const rootNode = new MCTSNode([question]);
+
+    const bestResponse = await mctsSearch(rootNode, 500);
+    console.log(`AI: ${bestResponse}`);
+
+    const userPrompt = askWithGemini(
+      generateUserResponse([...rootNode.conversationState], bestResponse).body,
+    );
+
+    const userResponse = await readAll(userPrompt);
+    console.log(`User: ${userResponse}`);
+
+    return bestResponse;
   }
 }
 
@@ -75,7 +108,7 @@ export const GlobalStoreProvider = ({ children }: React.PropsWithChildren) => {
 };
 
 export function useGlobalStore<TSelected = GlobalStore["state"]>(
-  selector?: (state: GlobalStore["state"]["state"]) => TSelected
+  selector?: (state: GlobalStore["state"]["state"]) => TSelected,
 ): TSelected {
   const store = useContext(GlobalStoreContext);
   if (store === null) {
@@ -83,6 +116,16 @@ export function useGlobalStore<TSelected = GlobalStore["state"]>(
   }
 
   return useStore(store.state, selector);
+}
+
+export function useGlobals() {
+  const store = useContext(GlobalStoreContext);
+
+  if (store === null) {
+    throw new Error("useGlobals must be used within a GlobalStoreProvider");
+  }
+
+  return store;
 }
 
 export function useVectorStore() {

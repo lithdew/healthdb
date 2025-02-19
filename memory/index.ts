@@ -1,13 +1,11 @@
-import { createParser } from "eventsource-parser";
-import { z } from "zod";
 import { getRetrieveFactsPrompt, getUpdateMemoryPrompt } from "../ai/functions";
-import type { AskWithGeminiBody, GeminiEvent } from "../ai/gemini";
 import { UpdateMemoryAction } from "../ai/prompts";
 import { Embedder } from "./embedder";
-import { type Embedding, type EmbeddingResult } from "./types";
+import { type Embedding } from "./types";
 import { HNSWVectorStore } from "./vector";
 import type Dexie from "dexie";
 import type { DexieSchema } from "../db";
+import { askWithGemini, readAllAndValidate } from "../ai/gemini.client";
 
 export interface Memory {
   id: number;
@@ -34,59 +32,6 @@ export class MemoryStore {
     this.vector = vector;
     this.embedder = embedder;
     this.db = db;
-  }
-
-  async *askWithGemini(body: AskWithGeminiBody) {
-    const response = await fetch("/ask", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-    if (response.body === null) {
-      throw new Error("Failed to get response body");
-    }
-
-    const stream = response.body.pipeThrough(
-      new TextDecoderStream("utf-8", { fatal: true })
-    );
-
-    const readable = new ReadableStream<GeminiEvent>({
-      async start(controller) {
-        const parser = createParser({
-          onEvent(event) {
-            controller.enqueue(JSON.parse(event.data));
-          },
-        });
-
-        // @ts-expect-error TODO: fix this
-        for await (const chunk of stream) {
-          parser.feed(chunk);
-        }
-
-        controller.close();
-      },
-    });
-
-    // @ts-expect-error TODO: fix this
-    for await (const chunk of readable) {
-      const event = chunk as GeminiEvent;
-      yield event;
-
-      if (event.candidates[0]?.finishReason === "STOP") {
-        break;
-      }
-    }
-  }
-
-  async readAll(response: AsyncGenerator<GeminiEvent, void, unknown>) {
-    let content = "";
-    for await (const chunk of response) {
-      const text = chunk.candidates[0]?.content.parts[0]?.text;
-      if (text !== undefined) {
-        content += text;
-      }
-    }
-
-    return content;
   }
 
   async getMemory(id: number): Promise<Memory | null> {
@@ -152,15 +97,6 @@ export class MemoryStore {
     await this.db.memories.delete(id);
   }
 
-  async readAllAndValidate<TSchema extends z.ZodTypeAny>(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    response: AsyncGenerator<GeminiEvent, any, unknown>,
-    schema: TSchema
-  ): Promise<z.infer<TSchema>> {
-    const content = await this.readAll(response);
-    return schema.parse(JSON.parse(content));
-  }
-
   private async addMemory({
     content,
     existingEmbeddings,
@@ -179,22 +115,31 @@ export class MemoryStore {
       content,
       createdAt,
     });
+    console.info({ id });
 
     this.vector.add([{ vector: embeddings, id }]);
     return { id, content, vector: embeddings, createdAt };
   }
 
-  async search(content: string): Promise<EmbeddingResult[]> {
+  async search(
+    content: string,
+    opts?: { threshold?: number },
+  ): Promise<Memory[]> {
+    const { threshold = 0.7 } = opts ?? {};
     const [embedding] = await this.embedder.embed([content]);
-    return this.vector.search(embedding);
+    const results = this.vector.search(embedding, { threshold });
+    const memories = await this.db.memories.bulkGet(results.map((r) => r.id));
+    return memories
+      .filter((m) => m !== undefined)
+      .map((m) => ({ ...m, vector: this.vector.get(m.id)!.vector }));
   }
 
   async add(content: string): Promise<Memory[]> {
     const retrieveFacts = getRetrieveFactsPrompt(content);
-    let response = this.askWithGemini(retrieveFacts.body);
-    const newRetrievedFacts = await this.readAllAndValidate(
+    let response = askWithGemini(retrieveFacts.body);
+    const newRetrievedFacts = await readAllAndValidate(
       response,
-      retrieveFacts.schema
+      retrieveFacts.schema,
     );
 
     const newMessageEmbeddings: Record<string, Embedding> = {};
@@ -203,16 +148,17 @@ export class MemoryStore {
       const [factEmbedding] = await this.embedder.embed([fact]);
       newMessageEmbeddings[fact] = factEmbedding;
       const relatedEmbeddings = this.vector.search(factEmbedding);
+      console.info(relatedEmbeddings);
       const memories = relatedEmbeddings.length
         ? await this.db.memories.bulkGet(relatedEmbeddings.map((v) => v.id))
         : [];
       for (const memory of memories.filter((m) => m !== undefined)) {
         const vector = relatedEmbeddings.find(
-          (v) => v.id === memory.id
+          (v) => v.id === memory.id,
         )?.vector;
         if (vector === undefined) {
           throw new Error(
-            `unexpected error here: ${memory}, ${relatedEmbeddings}`
+            `unexpected error here: ${memory}, ${relatedEmbeddings}`,
           );
         }
         retrievedOldMemories.push({
@@ -230,14 +176,17 @@ export class MemoryStore {
     });
 
     const updateMemoryPrompt = getUpdateMemoryPrompt(
-      retrievedOldMemories,
-      newRetrievedFacts.facts
+      retrievedOldMemories.map((m) => ({
+        ...m,
+        createdAt: new Date(m.createdAt).toISOString(),
+      })),
+      newRetrievedFacts.facts,
     );
 
     response = this.askWithGemini(updateMemoryPrompt.body);
     const newMemoriesWithActions = await this.readAllAndValidate(
       response,
-      updateMemoryPrompt.schema
+      updateMemoryPrompt.schema,
     );
 
     const returnedMemories: Memory[] = [];

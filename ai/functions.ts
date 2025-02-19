@@ -88,7 +88,7 @@ export function getSummarizeConversationPrompt(conversations: string[]) {
   return {
     body: {
       systemInstruction: {
-        role: "system" as const,
+        role: "model" as const,
         parts: [
           {
             text: SUMMARIZE_CONVERSATION_PROMPT,
@@ -99,11 +99,11 @@ export function getSummarizeConversationPrompt(conversations: string[]) {
         { role: "user" as const, parts: [{ text: conversations.join("\n") }] },
       ],
     },
-  } as const;
+  };
 }
 
 export function getUpdateMemoryPrompt(
-  oldMemory: { id: number; content: string }[],
+  oldMemory: { id: number; content: string; createdAt: string }[],
   newRetrievedFacts: string[],
 ) {
   const responseSchema = z.object({
