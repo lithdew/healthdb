@@ -8,6 +8,7 @@ import { askWithGemini, countTokens } from "./ai/google";
 import { Database } from "bun:sqlite";
 import { outdent } from "outdent";
 import stringify from "@solana/fast-stable-stringify";
+import { encode } from "eventsource-encoder";
 
 const db = new Database("db.sqlite", {
   strict: true,
@@ -62,10 +63,16 @@ export default async function handler({
           model: result.data.model,
           body: result.data,
         })) {
-          yield JSON.stringify(event);
+          yield encode({ data: JSON.stringify(event) });
         }
       },
-      { headers: { "Content-Type": "text/plain" } }
+      {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+        },
+      }
     );
   }
 

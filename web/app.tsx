@@ -1,4 +1,10 @@
-import { Network } from "@aptos-labs/ts-sdk";
+import {
+  AnySignature,
+  FixedBytes,
+  MoveVector,
+  Network,
+  U64,
+} from "@aptos-labs/ts-sdk";
 import {
   AptosWalletAdapterProvider,
   groupAndSortWallets,
@@ -9,6 +15,7 @@ import type {
   AskWithGeminiBody,
   GeminiCountTokensResponse,
 } from "../ai/gemini";
+import { createParser } from "eventsource-parser";
 
 function App() {
   return (
@@ -82,7 +89,7 @@ function LogoutPanel() {
 }
 
 function Home() {
-  const { account, isLoading } = useWallet();
+  const { account, isLoading, ...rest } = useWallet();
   return (
     <div className="h-dvh w-full bg-gray-50 flex flex-col">
       <div className="p-4 grow">
@@ -108,11 +115,24 @@ function Home() {
                 } satisfies AskWithGeminiBody),
               });
 
-              // @ts-expect-error - This is a valid async generator function
-              for await (const event of response.body.pipeThrough(
+              if (response.body === null) {
+                throw new Error("No body");
+              }
+
+              const stream = response.body.pipeThrough(
                 new TextDecoderStream("utf-8", { fatal: true })
-              )) {
-                console.log(event);
+              );
+
+              const parser = createParser({
+                onEvent(event) {
+                  const data = JSON.parse(event.data);
+                  console.log(data);
+                },
+              });
+
+              // @ts-expect-error - This is a valid async generator function
+              for await (const event of stream) {
+                parser.feed(event);
               }
             }}
           >
@@ -136,6 +156,33 @@ function Home() {
             }}
           >
             count tokens
+          </button>
+          <button
+            className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
+            onClick={async () => {
+              const message = new MoveVector([
+                new FixedBytes("0x1234"),
+                new FixedBytes("0x5678"),
+                new U64(10_000_000_000),
+              ]);
+
+              // console.log({ account, isLoading, ...rest });
+
+              const result = await rest.signMessage({
+                message: message.toString(),
+                nonce: "test",
+                address: true,
+                application: false,
+                chainId: false,
+              });
+
+              const signature = result.signature as AnySignature;
+              console.log(signature);
+              console.dir(signature, { depth: null });
+              console.dir(signature.signature.toString(), { depth: null });
+            }}
+          >
+            sign message
           </button>
         </div>
       </div>
