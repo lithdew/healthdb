@@ -6,9 +6,10 @@ import { type DexieSchema } from "../db";
 import { HNSWVectorStore } from "../memory/vector";
 import { MemoryStore } from "../memory";
 import { Embedder } from "../memory/embedder";
+import { AccountUtils, Ed25519Account } from "@aptos-labs/ts-sdk";
 
 interface State {
-  hello: "world";
+  account: Ed25519Account;
 }
 
 export class GlobalStore {
@@ -19,7 +20,23 @@ export class GlobalStore {
   memory: MemoryStore;
 
   constructor() {
-    this.state = new Store({ hello: "world" });
+    // NOTE(kenta): lol yes this is unsafe but the sign message
+    // api's in aptos wallet adapter really needs improvement
+
+    let account: Ed25519Account;
+
+    const encoded = window.localStorage.getItem("healthdb_keys");
+    if (encoded === null) {
+      account = Ed25519Account.generate();
+      window.localStorage.setItem(
+        "healthdb_keys",
+        AccountUtils.toHexString(account)
+      );
+    } else {
+      account = AccountUtils.ed25519AccountFromHex(encoded);
+    }
+
+    this.state = new Store({ account });
 
     this.db = new Dexie("my-db") as Dexie & DexieSchema;
     this.db.version(1).stores({

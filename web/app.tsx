@@ -1,97 +1,32 @@
-import {
-  AnySignature,
-  FixedBytes,
-  MoveVector,
-  Network,
-  U64,
-} from "@aptos-labs/ts-sdk";
-import {
-  AptosWalletAdapterProvider,
-  groupAndSortWallets,
-  useWallet,
-  WalletItem,
-} from "@aptos-labs/wallet-adapter-react";
+import { FixedBytes, MoveVector, U64 } from "@aptos-labs/ts-sdk";
 import type {
   AskWithGeminiBody,
   GeminiCountTokensResponse,
 } from "../ai/gemini";
-import { GlobalStoreProvider, useMemoryStore } from "./store";
+import { GlobalStoreProvider, useGlobalStore, useMemoryStore } from "./store";
 
 function App() {
   return (
     <GlobalStoreProvider>
-      <AptosWalletAdapterProvider
-        autoConnect
-        dappConfig={{
-          network: Network.TESTNET,
-          aptosApiKeys: {
-            testnet: import.meta.env.VITE_APTOS_API_KEY_TESTNET,
-          },
-          aptosConnect: {
-            dappName: "HealthDB",
-            dappIcon: `${window.location.origin}/favicon.ico`,
-          },
-        }}
-      >
-        <Home />
-      </AptosWalletAdapterProvider>
+      <Home />
     </GlobalStoreProvider>
   );
 }
 
-function LoginPanel() {
-  const { wallet, wallets = [], ...rest } = useWallet();
-
-  console.log({ wallet, wallets, ...rest });
-
-  const { aptosConnectWallets } = groupAndSortWallets(wallets, {});
-
-  return aptosConnectWallets.map((wallet) => {
-    return (
-      <WalletItem
-        key={wallet.name}
-        wallet={wallet}
-        onConnect={() => {
-          console.log("connected");
-        }}
-      >
-        <WalletItem.ConnectButton asChild>
-          <button className="cursor-pointer w-full gap-3 flex items-center bg-gray-300 px-3 py-2 rounded-md">
-            <WalletItem.Icon className="size-8" />
-            <WalletItem.Name className="text-lg font-normal" />
-          </button>
-        </WalletItem.ConnectButton>
-      </WalletItem>
-    );
-  });
-}
-
 function LogoutPanel() {
-  const { account, disconnect } = useWallet();
-
-  if (account === null) {
-    return null;
-  }
+  const account = useGlobalStore((state) => state.account);
 
   return (
     <>
       <div>
-        <span>You are logged in as: {account?.address}</span>
+        <span>You are logged in as: {account.accountAddress.toString()}</span>
       </div>
-      <button
-        className="bg-gray-300 px-3 py-2 rounded-md text-lg font-normal"
-        onClick={() => {
-          disconnect();
-        }}
-      >
-        Logout
-      </button>
     </>
   );
 }
 
 function Home() {
-  const { account, isLoading, ...rest } = useWallet();
+  const account = useGlobalStore((state) => state.account);
   const memory = useMemoryStore();
 
   return (
@@ -99,14 +34,7 @@ function Home() {
       <div className="p-4 grow">
         <div>Hello world</div>
         <div className="grid gap-2">
-          {isLoading ? (
-            <div>Loading...</div>
-          ) : (
-            <>
-              {account === null && <LoginPanel />}
-              {account !== null && <LogoutPanel />}
-            </>
-          )}
+          <LogoutPanel />
           <button
             className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
             onClick={async () => {
@@ -174,20 +102,8 @@ function Home() {
                 new U64(10_000_000_000),
               ]);
 
-              // console.log({ account, isLoading, ...rest });
-
-              const result = await rest.signMessage({
-                message: message.toString(),
-                nonce: "test",
-                address: true,
-                application: false,
-                chainId: false,
-              });
-
-              const signature = result.signature as AnySignature;
-              console.log(signature);
-              console.dir(signature, { depth: null });
-              console.dir(signature.signature.toString(), { depth: null });
+              const signature = account.sign(message.bcsToBytes());
+              console.log(signature.toString());
             }}
           >
             sign message
