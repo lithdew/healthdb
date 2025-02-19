@@ -1,20 +1,23 @@
 import Dexie, { type EntityTable } from "dexie";
 import { cosineSimilarity, HNSW, Node } from "../hnsw/hnsw";
 import type { Embedding, EmbeddingResult, VectorStore } from "./types";
+import { Embedder } from "./embedder";
 
 export class HNSWVectorStore implements VectorStore {
   hnsw: HNSW;
   dexie: Dexie & {
     hnswStore: EntityTable<Node, "id">;
   };
+  dexieDbName: string;
 
-  constructor(dexieDbName: string) {
+  constructor(dexieDbName: string, dimension: number) {
     this.hnsw = new HNSW({
       efConstruction: 200,
       M: 16,
-      d: 5,
+      d: dimension,
       metric: cosineSimilarity,
     });
+    this.dexieDbName = dexieDbName;
     this.dexie = new Dexie(dexieDbName) as Dexie & {
       hnswStore: EntityTable<Node, "id">;
     };
@@ -82,5 +85,10 @@ export class HNSWVectorStore implements VectorStore {
     for (const node of nodes) {
       this.hnsw.add(node.id, node.vector);
     }
+  }
+
+  async clear() {
+    this.hnsw.nodes = new Map();
+    // await this.dexie.delete();
   }
 }
