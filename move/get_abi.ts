@@ -45,7 +45,7 @@ const config = new AptosConfig({
 const aptos = new Aptos(config);
 
 const moduleAddress =
-  "0x3f29e3c1990daec326eb7a210cb7b30fe1369d5c3a44b27870c782508fea93e1";
+  "0xb37472066d5c19a3815b265357bb1b3e1d7825685c05b22c08707ecbac6b1a64";
 
 const [module] = await aptos.getAccountModules({
   accountAddress: moduleAddress,

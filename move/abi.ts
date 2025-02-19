@@ -1,5 +1,5 @@
 export const ABI = {
-  "address": "0x3f29e3c1990daec326eb7a210cb7b30fe1369d5c3a44b27870c782508fea93e1",
+  "address": "0xb37472066d5c19a3815b265357bb1b3e1d7825685c05b22c08707ecbac6b1a64",
   "name": "token",
   "friends": [],
   "exposed_functions": [
@@ -36,7 +36,6 @@ export const ABI = {
       "is_view": false,
       "generic_type_params": [],
       "params": [
-        "&signer",
         "address",
         "u8",
         "vector<u8>",
@@ -67,7 +66,7 @@ export const ABI = {
         "vector<u8>"
       ],
       "return": [
-        "0x1::object::Object<0x3f29e3c1990daec326eb7a210cb7b30fe1369d5c3a44b27870c782508fea93e1::token::Receipt>"
+        "0x1::object::Object<0xb37472066d5c19a3815b265357bb1b3e1d7825685c05b22c08707ecbac6b1a64::token::Receipt>"
       ]
     }
   ],
@@ -96,6 +95,10 @@ export const ABI = {
         {
           "name": "mutate_metadata_ref",
           "type": "0x1::fungible_asset::MutateMetadataRef"
+        },
+        {
+          "name": "extend_ref",
+          "type": "0x1::object::ExtendRef"
         }
       ]
     },
@@ -110,7 +113,7 @@ export const ABI = {
       "fields": [
         {
           "name": "body",
-          "type": "0x3f29e3c1990daec326eb7a210cb7b30fe1369d5c3a44b27870c782508fea93e1::token::ReceiptBody"
+          "type": "0xb37472066d5c19a3815b265357bb1b3e1d7825685c05b22c08707ecbac6b1a64::token::ReceiptBody"
         },
         {
           "name": "signature",

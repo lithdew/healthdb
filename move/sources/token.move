@@ -8,7 +8,7 @@ module healthdb::token {
         Metadata
     };
     use aptos_framework::account::{Self};
-    use aptos_framework::object::{Self, Object};
+    use aptos_framework::object::{Self, Object, ExtendRef};
     use aptos_framework::primary_fungible_store;
     use std::error;
     use std::signer;
@@ -30,7 +30,8 @@ module healthdb::token {
         mint_ref: MintRef,
         transfer_ref: TransferRef,
         burn_ref: BurnRef,
-        mutate_metadata_ref: MutateMetadataRef
+        mutate_metadata_ref: MutateMetadataRef,
+        extend_ref: ExtendRef
     }
 
     struct Receipt has key {
@@ -64,10 +65,11 @@ module healthdb::token {
         let mutate_metadata_ref =
             fungible_asset::generate_mutate_metadata_ref(constructor_ref);
         let metadata_object_signer = object::generate_signer(constructor_ref);
+        let extend_ref = object::generate_extend_ref(constructor_ref);
 
         move_to(
             &metadata_object_signer,
-            Asset { mint_ref, transfer_ref, burn_ref, mutate_metadata_ref }
+            Asset { mint_ref, transfer_ref, burn_ref, mutate_metadata_ref, extend_ref }
         );
     }
 
@@ -84,7 +86,6 @@ module healthdb::token {
     }
 
     public entry fun acknowledge_receipt(
-        user: &signer,
         from: address,
         from_scheme: u8,
         from_public_key: vector<u8>,
@@ -115,7 +116,9 @@ module healthdb::token {
 
         let receipt = Receipt { body, signature: signature_bytes };
 
-        let constructor_ref = &object::create_named_object(user, signature_bytes);
+        let extended_signer = &object::generate_signer_for_extending(&asset.extend_ref);
+        let constructor_ref =
+            &object::create_named_object(extended_signer, signature_bytes);
         let object_signer = object::generate_signer(constructor_ref);
         move_to(&object_signer, receipt);
 
@@ -192,7 +195,6 @@ module healthdb::token {
         let signature = ed25519::sign_struct(&user_sk, body);
 
         acknowledge_receipt(
-            admin,
             signer::address_of(&user),
             user_scheme,
             user_public_key,
@@ -211,9 +213,12 @@ module healthdb::token {
                 == 10_000_000_000
         );
 
+        let asset = &Asset[object::object_address(&metadata)];
+        let extended_signer = &object::generate_signer_for_extending(&asset.extend_ref);
         let receipt_address =
             object::create_object_address(
-                &@healthdb, ed25519::signature_to_bytes(&signature)
+                &signer::address_of(extended_signer),
+                ed25519::signature_to_bytes(&signature)
             );
         let receipt_object = object::address_to_object<Receipt>(receipt_address);
         let receipt = &Receipt[object::object_address(&receipt_object)];
@@ -244,7 +249,6 @@ module healthdb::token {
         let signature = ed25519::sign_struct(&user_sk, body);
 
         acknowledge_receipt(
-            admin,
             signer::address_of(&user),
             user_scheme,
             user_public_key,
@@ -254,7 +258,6 @@ module healthdb::token {
         );
 
         acknowledge_receipt(
-            admin,
             signer::address_of(&user),
             user_scheme,
             user_public_key,
