@@ -12,13 +12,13 @@ export class Node {
     id: number,
     vector: Float32Array | number[],
     level: number,
-    M: number
+    M: number,
   ) {
     this.id = id;
     this.vector = vector;
     this.level = level;
     this.neighbors = Array.from({ length: level + 1 }, () =>
-      new Array(M).fill(-1)
+      new Array(M).fill(-1),
     );
   }
 }
@@ -51,7 +51,7 @@ class LemirePriorityQueue<T> implements PriorityQueue<T> {
 
 export function dotProduct(
   a: Float32Array | number[],
-  b: Float32Array | number[]
+  b: Float32Array | number[],
 ) {
   let dp = 0.0;
   for (let i = 0; i < a.length; i++) {
@@ -70,7 +70,7 @@ export function magnitude(a: Float32Array | number[]) {
 
 export function cosineSimilarity(
   a: Float32Array | number[],
-  b: Float32Array | number[]
+  b: Float32Array | number[],
 ) {
   return dotProduct(a, b) / (magnitude(a) * magnitude(b));
 }
@@ -89,7 +89,7 @@ export class HNSW {
     props: {
       metric: (
         a: number[] | Float32Array,
-        b: number[] | Float32Array
+        b: number[] | Float32Array,
       ) => number;
       M: number;
       efConstruction: number;
@@ -99,7 +99,7 @@ export class HNSW {
       efConstruction: 200,
       d: null,
       metric: cosineSimilarity,
-    }
+    },
   ) {
     this.metric = props.metric;
     this.d = props.d;
@@ -180,7 +180,7 @@ export class HNSW {
     const closestLevel = Math.min(node.level, closest.level);
     for (let level = 0; level <= closestLevel; level++) {
       closest.neighbors[level] = closest.neighbors[level].filter(
-        (id) => id !== -1
+        (id) => id !== -1,
       );
       closest.neighbors[level].push(node.id);
       if (closest.neighbors[level].length > this.M) {
@@ -216,10 +216,14 @@ export class HNSW {
     if (this.nodes.size === 1) {
       const entrypoint = this.nodes.get(this.entrypointId)!;
       const similarity = this.metric(query, entrypoint.vector);
-      return [{ id: this.entrypointId, similarity }];
+      return [{ id: this.entrypointId, similarity, vector: entrypoint.vector }];
     }
 
-    const results: { id: number; similarity: number }[] = [];
+    const results: {
+      id: number;
+      similarity: number;
+      vector: Float32Array | number[];
+    }[] = [];
     const visited = new Set<number>();
 
     const candidates = new LemirePriorityQueue<number>((a, b) => {
@@ -250,7 +254,7 @@ export class HNSW {
       const similarity = this.metric(query, current.vector);
 
       if (similarity > 0) {
-        results.push({ id: currentId, similarity });
+        results.push({ id: currentId, similarity, vector: current.vector });
       }
 
       if (current.level === 0) {

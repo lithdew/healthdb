@@ -11,7 +11,7 @@ const auth = new GoogleAuth({
 });
 
 type GeminiContent = { role: "user" | "model"; parts: { text: string }[] };
-type GeminiEvent = {
+export type GeminiEvent = {
   candidates:
     | []
     | [
@@ -38,67 +38,69 @@ type GeminiEvent = {
   };
 };
 
+export interface AskWithGeminiBody {
+  contents: GeminiContent[];
+  systemInstruction?: {
+    role: "system";
+    parts: { text: string }[];
+  };
+  tools?: (
+    | {
+        functionDeclarations?: {
+          name: string;
+          description: string;
+          parameters: z.Schema | ReturnType<typeof zodToVertexSchema>;
+        }[];
+        googleSearchRetrieval?: never;
+        googleSearch?: never;
+      }
+    | {
+        googleSearchRetrieval?: {
+          mode: "MODE_UNSPECIFIED" | "MODE_DYNAMIC";
+          dynamicThreshold: number;
+        };
+        googleSearch?: never;
+        functionDeclarations?: never;
+      }
+    | {
+        googleSearch?: {};
+        googleSearchRetrieval?: never;
+        functionDeclarations?: never;
+      }
+  )[];
+  toolConfig?: {
+    functionCallingConfig?: {
+      mode: "AUTO" | "ANY" | "NONE";
+      allowedFunctionNames: string[];
+    };
+  };
+  generationConfig?: {
+    temperature?: number;
+    topP?: number;
+    topK?: number;
+    candidateCount?: 1;
+    maxOutputTokens?: number;
+    presencePenalty?: number;
+    frequencyPenalty?: number;
+    stopSequences?: string[];
+    seed?: number;
+  } & (
+    | {
+        responseMimeType: "application/json";
+        responseSchema: z.Schema | ReturnType<typeof zodToVertexSchema>;
+      }
+    | {
+        responseMimeType?: "text/plain";
+        responseSchema?: never;
+      }
+  );
+}
+
 interface AskWithGeminiParams {
   location: "us-central1";
   projectId: string;
   model: Model;
-  body: {
-    contents: GeminiContent[];
-    systemInstruction?: {
-      role: "system";
-      parts: { text: string }[];
-    };
-    tools?: (
-      | {
-          functionDeclarations?: {
-            name: string;
-            description: string;
-            parameters: z.Schema | ReturnType<typeof zodToVertexSchema>;
-          }[];
-          googleSearchRetrieval?: never;
-          googleSearch?: never;
-        }
-      | {
-          googleSearchRetrieval?: {
-            mode: "MODE_UNSPECIFIED" | "MODE_DYNAMIC";
-            dynamicThreshold: number;
-          };
-          googleSearch?: never;
-          functionDeclarations?: never;
-        }
-      | {
-          googleSearch?: {};
-          googleSearchRetrieval?: never;
-          functionDeclarations?: never;
-        }
-    )[];
-    toolConfig?: {
-      functionCallingConfig?: {
-        mode: "AUTO" | "ANY" | "NONE";
-        allowedFunctionNames: string[];
-      };
-    };
-    generationConfig?: {
-      temperature?: number;
-      topP?: number;
-      topK?: number;
-      candidateCount?: 1;
-      maxOutputTokens?: number;
-      presencePenalty?: number;
-      frequencyPenalty?: number;
-      stopSequences?: string[];
-      seed?: number;
-    } & (
-      | {
-          responseMimeType: "application/json";
-          responseSchema: z.Schema | ReturnType<typeof zodToVertexSchema>;
-        }
-      | {
-          responseMimeType?: "text/plain";
-          responseSchema?: never;
-        }
-    );
-  };
+  body: AskWithGeminiBody;
 }
 
 export async function* askWithGemini(params: AskWithGeminiParams) {

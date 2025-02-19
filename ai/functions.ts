@@ -1,33 +1,22 @@
 import {
   EXTRACT_MEASUREMENT_PROMPT,
   FACT_RETRIEVAL_PROMPT,
-  getUpdateMemoryPrompt,
   SUMMARIZE_CONVERSATION_PROMPT,
   UpdateMemoryAction,
+  updateMemoryPrompt,
 } from "./prompts";
-import config from "../service_account.json";
-import { askWithGemini, readAllAndValidate } from "./google";
 import { z } from "zod";
 
-type Model = "gemini-1.5-flash" | "gemini-2.0-flash";
-
-const getParams = (model: Model) =>
-  ({
-    location: "us-central1",
-    projectId: config.project_id,
-    model,
-  }) as const;
-
-export async function retrieveFactsPrompt(text: string) {
-  const params = getParams("gemini-2.0-flash");
+export function getRetrieveFactsPrompt(text: string) {
   const responseSchema = z.object({
     facts: z.array(z.string()),
   });
-  const response = askWithGemini({
-    ...params,
+
+  return {
+    schema: responseSchema,
     body: {
       systemInstruction: {
-        role: "system",
+        role: "system" as const,
         parts: [
           {
             text: FACT_RETRIEVAL_PROMPT.replace(
@@ -39,22 +28,19 @@ export async function retrieveFactsPrompt(text: string) {
       },
       contents: [
         {
-          role: "user",
+          role: "user" as const,
           parts: [{ text }],
         },
       ],
       generationConfig: {
-        responseMimeType: "application/json",
+        responseMimeType: "application/json" as const,
         responseSchema,
       },
     },
-  });
-  const result = await readAllAndValidate(response, responseSchema);
-  return result.facts;
+  };
 }
 
-export async function extractMeasurementsPrompt(text: string) {
-  const params = getParams("gemini-2.0-flash");
+export function getExtractMeasurementsPrompt(text: string) {
   const responseSchema = z.object({
     measurements: z.array(
       z.object({
@@ -65,11 +51,11 @@ export async function extractMeasurementsPrompt(text: string) {
       }),
     ),
   });
-  const response = askWithGemini({
-    ...params,
+  return {
+    schema: responseSchema,
     body: {
       systemInstruction: {
-        role: "system",
+        role: "system" as const,
         parts: [
           {
             text: EXTRACT_MEASUREMENT_PROMPT,
@@ -78,7 +64,7 @@ export async function extractMeasurementsPrompt(text: string) {
       },
       contents: [
         {
-          role: "user",
+          role: "user" as const,
           parts: [
             {
               text: [
@@ -90,43 +76,39 @@ export async function extractMeasurementsPrompt(text: string) {
         },
       ],
       generationConfig: {
-        responseMimeType: "application/json",
+        responseMimeType: "application/json" as const,
         responseSchema,
       },
     },
-  });
-
-  const result = await readAllAndValidate(response, responseSchema);
-  return result.measurements;
+  };
 }
 
-export function summarizeConversationPrompt(conversations: string[]) {
-  const params = getParams("gemini-2.0-flash");
-  return askWithGemini({
-    ...params,
+export function getSummarizeConversationPrompt(conversations: string[]) {
+  return {
     body: {
       systemInstruction: {
-        role: "system",
+        role: "system" as const,
         parts: [
           {
             text: SUMMARIZE_CONVERSATION_PROMPT,
           },
         ],
       },
-      contents: [{ role: "user", parts: [{ text: conversations.join("\n") }] }],
+      contents: [
+        { role: "user" as const, parts: [{ text: conversations.join("\n") }] },
+      ],
     },
-  });
+  } as const;
 }
 
-export async function updateMemoryPrompt(
-  oldMemory: { id: string; text: string }[],
+export function getUpdateMemoryPrompt(
+  oldMemory: { id: number; content: string }[],
   newRetrievedFacts: string[],
 ) {
-  const params = getParams("gemini-2.0-flash");
-  const updateMemorySchema = z.object({
+  const responseSchema = z.object({
     actions: z.array(
       z.object({
-        id: z.string(),
+        id: z.number(),
         text: z.string(),
         action: z.enum([
           UpdateMemoryAction.ADD,
@@ -137,31 +119,29 @@ export async function updateMemoryPrompt(
       }),
     ),
   });
-  const { system, user } = getUpdateMemoryPrompt({
+  const { system, user } = updateMemoryPrompt({
     oldMemory,
     newRetrievedFacts,
   });
-  const response = askWithGemini({
-    ...params,
+  return {
     body: {
       systemInstruction: {
-        role: "system",
+        role: "system" as const,
         parts: [{ text: system }],
       },
-      contents: [{ role: "user", parts: [{ text: user }] }],
+      contents: [{ role: "user" as const, parts: [{ text: user }] }],
       generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: updateMemorySchema,
+        responseMimeType: "application/json" as const,
+        responseSchema,
       },
     },
-  });
-  const result = await readAllAndValidate(response, updateMemorySchema);
-  return result.actions;
+    schema: responseSchema,
+  };
 }
 
 if (import.meta.env) {
-  const measurements = await extractMeasurementsPrompt(
-    "my heart rate was going crazy yesterday, i feel like i cant breath, i measured it around 250bpm, my blood pressure was 180/120",
-  );
-  console.info(measurements);
+  // const measurements = await extractMeasurementsPrompt(
+  //   "my heart rate was going crazy yesterday, i feel like i cant breath, i measured it around 250bpm, my blood pressure was 180/120",
+  // );
+  // console.info(measurements);
 }

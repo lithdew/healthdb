@@ -113,11 +113,11 @@ export const UpdateMemoryAction = {
   NONE: "NONE",
 } as const;
 
-export const getUpdateMemoryPrompt = ({
+export const updateMemoryPrompt = ({
   oldMemory,
   newRetrievedFacts,
 }: {
-  oldMemory: { id: string; text: string }[];
+  oldMemory: { id: number; content: string }[];
   newRetrievedFacts: string[];
 }) => ({
   system: `You are a smart memory manager which controls the memory of a system.
@@ -138,7 +138,7 @@ export const getUpdateMemoryPrompt = ({
             - Old Memory:
                 [
                     {{
-                        "id" : "0",
+                        "id" : 0,
                         "text" : "User is a software engineer"
                     }}
                 ]
@@ -147,12 +147,12 @@ export const getUpdateMemoryPrompt = ({
                 {{
                     "memory" : [
                         {{
-                            "id" : "0",
+                            "id" : 0,
                             "text" : "User is a software engineer",
                             "action" : ${UpdateMemoryAction.NONE}
                         }},
                         {{
-                            "id" : "1",
+                            "id" : 1,
                             "text" : "Name is John",
                             "action" : ${UpdateMemoryAction.ADD}
                         }}
@@ -171,15 +171,15 @@ export const getUpdateMemoryPrompt = ({
             - Old Memory:
                 [
                     {{
-                        "id" : "0",
+                        "id" : 0,
                         "text" : "I really like cheese pizza"
                     }},
                     {{
-                        "id" : "1",
+                        "id" : 1,
                         "text" : "User is a software engineer"
                     }},
                     {{
-                        "id" : "2",
+                        "id" : 2,
                         "text" : "User likes to play cricket"
                     }}
                 ]
@@ -188,18 +188,18 @@ export const getUpdateMemoryPrompt = ({
                 {{
                 "memory" : [
                         {{
-                            "id" : "0",
+                            "id" : 0,
                             "text" : "Loves cheese and chicken pizza",
                             "action" : ${UpdateMemoryAction.UPDATE},
                             "old_memory" : "I really like cheese pizza"
                         }},
                         {{
-                            "id" : "1",
+                            "id" : 1,
                             "text" : "User is a software engineer",
                             "action" : ${UpdateMemoryAction.NONE}
                         }},
                         {{
-                            "id" : "2",
+                            "id" : 2,
                             "text" : "Loves to play cricket with friends",
                             "action" : ${UpdateMemoryAction.UPDATE},
                             "old_memory" : "User likes to play cricket"
@@ -214,11 +214,11 @@ export const getUpdateMemoryPrompt = ({
             - Old Memory:
                 [
                     {{
-                        "id" : "0",
+                        "id" : 0,
                         "text" : "Name is John"
                     }},
                     {{
-                        "id" : "1",
+                        "id" : 1,
                         "text" : "Loves cheese pizza"
                     }}
                 ]
@@ -227,12 +227,12 @@ export const getUpdateMemoryPrompt = ({
                 {{
                 "memory" : [
                         {{
-                            "id" : "0",
+                            "id" : 0,
                             "text" : "Name is John",
                             "action" : ${UpdateMemoryAction.NONE}
                         }},
                         {{
-                            "id" : "1",
+                            "id" : 1,
                             "text" : "Loves cheese pizza",
                             "action" : ${UpdateMemoryAction.DELETE}
                         }}
@@ -244,11 +244,11 @@ export const getUpdateMemoryPrompt = ({
             - Old Memory:
                 [
                     {{
-                        "id" : "0",
+                        "id" : 0,
                         "text" : "Name is John"
                     }},
                     {{
-                        "id" : "1",
+                        "id" : 1,
                         "text" : "Loves cheese pizza"
                     }}
                 ]
@@ -257,12 +257,12 @@ export const getUpdateMemoryPrompt = ({
                 {{
                 "memory" : [
                         {{
-                            "id" : "0",
+                            "id" : 0,
                             "text" : "Name is John",
                             "action" : ${UpdateMemoryAction.NONE}
                         }},
                         {{
-                            "id" : "1",
+                            "id" : 1,
                             "text" : "Loves cheese pizza",
                             "action" : ${UpdateMemoryAction.NONE}
                         }}
