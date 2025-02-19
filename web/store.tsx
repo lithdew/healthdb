@@ -157,7 +157,7 @@ async function visitResearchNode(
 
   state.setState((state) => ({
     ...state,
-    nodes: new Map(state.nodes).set(current.id, current),
+    nodes: new Map(state.nodes).set(current.id, structuredClone(current)),
   }));
 
   for await (const event of generateResponse(current.history, prompt)) {
@@ -169,11 +169,16 @@ async function visitResearchNode(
 
     state.setState((state) => ({
       ...state,
-      nodes: new Map(state.nodes).set(current.id, current),
+      nodes: new Map(state.nodes).set(current.id, structuredClone(current)),
     }));
   }
 
   current.status = "completed";
+
+  state.setState((state) => ({
+    ...state,
+    nodes: new Map(state.nodes).set(current.id, structuredClone(current)),
+  }));
 
   if (current.depth >= 2) {
     return;
@@ -193,10 +198,17 @@ async function visitResearchNode(
       buffer: "",
     };
 
+    current.children.push(child);
+
     queue.add(async () => {
       await visitResearchNode(state, queue, child, current.buffer);
     });
   }
+
+  state.setState((state) => ({
+    ...state,
+    nodes: new Map(state.nodes).set(current.id, structuredClone(current)),
+  }));
 }
 
 export class GlobalStore {

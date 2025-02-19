@@ -9,8 +9,7 @@ import { Decimal } from "decimal.js";
 import { useState } from "react";
 import type {
   AskWithGeminiBody,
-  GeminiCountTokensResponse,
-  GeminiEvent,
+  GeminiCountTokensResponse
 } from "../ai/gemini";
 import { ABI } from "../move/abi";
 import { aptos } from "../move/aptos";
@@ -20,9 +19,9 @@ import {
 } from "./globals";
 import { GlobalStoreProvider, useGlobalStore, useMemoryStore } from "./store";
 
-import { useGlobals } from "./store";
 import { outdent } from "outdent";
 import Markdown from "react-markdown";
+import { useGlobals } from "./store";
 
 function App() {
   const [queryClient] = useState(new QueryClient());
