@@ -11,7 +11,7 @@ export const geminiEventSchema = z.object({
         content: geminiContentSchema,
         finishReason: z.enum(["STOP"]).optional(),
       }),
-    ]),
+    ])
   ),
   usageMetadata: z.object({
     promptTokenCount: z.number(),
@@ -21,18 +21,18 @@ export const geminiEventSchema = z.object({
       z.object({
         modality: z.enum(["TEXT", "IMAGE"]),
         tokenCount: z.number(),
-      }),
+      })
     ),
     candidatesTokensDetails: z.array(
       z.object({
         modality: z.enum(["TEXT", "IMAGE"]),
         tokenCount: z.number(),
-      }),
+      })
     ),
-    modelVersion: z.string(),
-    createTime: z.string(),
-    responseId: z.string(),
   }),
+  modelVersion: z.string(),
+  createTime: z.string(),
+  responseId: z.string(),
 });
 
 const geminiToolSchema = z.object({
@@ -42,7 +42,7 @@ const geminiToolSchema = z.object({
         name: z.string(),
         description: z.string(),
         parameters: z.instanceof(z.Schema).or(z.unknown()),
-      }),
+      })
     )
     .optional(),
   googleSearchRetrieval: z

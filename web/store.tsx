@@ -74,7 +74,7 @@ const USER_PROMPT = outdent`
   Based on the <current-message> Respond as a user in a way that **extends the conversation naturally**, providing **useful follow-ups, additional context, or new concerns**.
 `;
 
-export async function* generateAiResponse(
+async function* generateAiResponse(
   history: { role: "model" | "user"; text: string }[],
   message: string
 ) {
@@ -98,7 +98,7 @@ export async function* generateAiResponse(
   });
 }
 
-export async function* generateUserResponse(
+async function* generateUserResponse(
   history: { role: "model" | "user"; text: string }[],
   message: string
 ) {
@@ -132,6 +132,7 @@ interface ResearchNode {
   status: "generating" | "completed";
   events: GeminiEvent[];
   buffer: string;
+  createdAt: number;
 }
 
 interface State {
@@ -144,7 +145,7 @@ interface State {
 }
 
 async function visitResearchNode(
-  state: Store<State>,
+  db: Dexie & DexieSchema,
   queue: PQueue,
   current: ResearchNode,
   prompt: string
@@ -155,30 +156,43 @@ async function visitResearchNode(
   const generateResponse =
     currentRole === "model" ? generateAiResponse : generateUserResponse;
 
-  state.setState((state) => ({
-    ...state,
-    nodes: new Map(state.nodes).set(current.id, structuredClone(current)),
-  }));
+  db.researchNodes.add({
+    id: current.id,
+    depth: current.depth,
+    history: structuredClone(current.history),
+    children: current.children.map((c) => c.id),
+    status: current.status,
+    events: current.events,
+    buffer: current.buffer,
+    createdAt: current.createdAt,
+  });
+
+  // state.setState((state) => ({
+  //   ...state,
+  //   nodes: new Map(state.nodes).set(current.id, structuredClone(current)),
+  // }));
 
   for await (const event of generateResponse(current.history, prompt)) {
     current.events.push(event);
-    const text = event.candidates[0]?.content.parts[0].text;
+    const text = event.candidates[0]?.content?.parts?.[0]?.text;
     if (text !== undefined) {
       current.buffer += text;
     }
 
-    state.setState((state) => ({
-      ...state,
-      nodes: new Map(state.nodes).set(current.id, structuredClone(current)),
-    }));
+    db.researchNodes.update(current.id, {
+      ...current,
+      children: current.children.map((c) => c.id),
+      events: [...current.events, event],
+      buffer: current.buffer + text,
+    });
   }
 
   current.status = "completed";
 
-  state.setState((state) => ({
-    ...state,
-    nodes: new Map(state.nodes).set(current.id, structuredClone(current)),
-  }));
+  db.researchNodes.update(current.id, {
+    ...current,
+    children: current.children.map((c) => c.id),
+  });
 
   if (current.depth >= 2) {
     return;
@@ -196,19 +210,20 @@ async function visitResearchNode(
       status: "generating",
       events: [],
       buffer: "",
+      createdAt: Date.now(),
     };
 
     current.children.push(child);
 
     queue.add(async () => {
-      await visitResearchNode(state, queue, child, current.buffer);
+      await visitResearchNode(db, queue, child, current.buffer);
     });
   }
 
-  state.setState((state) => ({
-    ...state,
-    nodes: new Map(state.nodes).set(current.id, structuredClone(current)),
-  }));
+  db.researchNodes.update(current.id, {
+    ...current,
+    children: current.children.map((c) => c.id),
+  });
 }
 
 export class GlobalStore {
@@ -236,10 +251,11 @@ export class GlobalStore {
           status: "generating",
           events: [],
           buffer: "",
+          createdAt: Date.now(),
         };
 
         queue.add(async () => {
-          await visitResearchNode(this.state, queue, init, prompt);
+          await visitResearchNode(this.db, queue, init, prompt);
         });
       }
     } finally {
@@ -281,6 +297,7 @@ export class GlobalStore {
       conversations: "++id",
       memories: "++id",
       events: "++id",
+      researchNodes: "id",
     });
     void this.db.open();
 

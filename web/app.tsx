@@ -9,7 +9,7 @@ import { Decimal } from "decimal.js";
 import { useState } from "react";
 import type {
   AskWithGeminiBody,
-  GeminiCountTokensResponse
+  GeminiCountTokensResponse,
 } from "../ai/gemini";
 import { ABI } from "../move/abi";
 import { aptos } from "../move/aptos";
@@ -17,7 +17,13 @@ import {
   HEALTH_AI_AGENT_CREATOR_ADDRESS,
   HEALTH_TOKEN_ADDRESS,
 } from "./globals";
-import { GlobalStoreProvider, useGlobalStore, useMemoryStore } from "./store";
+import {
+  GlobalStoreProvider,
+  useDexie,
+  useGlobalStore,
+  useMemoryStore,
+} from "./store";
+import { useLiveQuery } from "dexie-react-hooks";
 
 import { outdent } from "outdent";
 import Markdown from "react-markdown";
@@ -98,11 +104,16 @@ function LogoutPanel() {
 }
 
 function ResearchPanel() {
-  const nodeIds = useGlobalStore((state) => [...state.nodes.keys()]);
+  const db = useDexie();
+  const nodeIds = useLiveQuery(async () => {
+    const collection = db.researchNodes.toCollection();
+
+    return await collection.primaryKeys();
+  });
 
   return (
     <div>
-      {nodeIds.map((id) => (
+      {(nodeIds ?? []).map((id) => (
         <ResearchNodePanel key={id} nodeId={id} />
       ))}
     </div>
@@ -110,7 +121,10 @@ function ResearchPanel() {
 }
 
 function ResearchNodePanel({ nodeId }: { nodeId: string }) {
-  const node = useGlobalStore((state) => state.nodes.get(nodeId));
+  const db = useDexie();
+  const node = useLiveQuery(async () => {
+    return db.researchNodes.get(nodeId);
+  });
 
   if (node === undefined) {
     return <div>Node {nodeId} not found</div>;
