@@ -78,7 +78,7 @@ export function getExtractMeasurementsPrompt(text: string) {
       ],
       generationConfig: {
         responseMimeType: "application/json" as const,
-        responseSchema,
+        responseSchema: zodToVertexSchema(responseSchema),
       },
     },
   };
@@ -133,7 +133,7 @@ export function getUpdateMemoryPrompt(
       contents: [{ role: "user" as const, parts: [{ text: user }] }],
       generationConfig: {
         responseMimeType: "application/json" as const,
-        responseSchema,
+        responseSchema: zodToVertexSchema(responseSchema),
       },
     },
     schema: responseSchema,

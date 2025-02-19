@@ -138,6 +138,14 @@ function Home() {
           <button
             className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
             onClick={async () => {
+              memory?.list();
+            }}
+          >
+            list memories
+          </button>
+          <button
+            className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
+            onClick={async () => {
               const response = await fetch("/tokens", {
                 method: "POST",
                 body: JSON.stringify({

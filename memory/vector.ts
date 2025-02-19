@@ -1,13 +1,13 @@
+import type { DB } from "../db";
 import { cosineSimilarity, HNSW } from "../hnsw/hnsw";
 import type { Embedding, EmbeddingResult, VectorStore } from "./types";
-import type { Database } from "../db";
 
 export class HNSWVectorStore implements VectorStore {
   hnsw: HNSW;
-  db: Database;
+  db: DB;
   changed: boolean = false;
 
-  constructor(db: Database, dimension: number) {
+  constructor(db: DB, dimension: number) {
     this.db = db;
     this.hnsw = new HNSW({
       efConstruction: 200,
@@ -60,6 +60,9 @@ export class HNSWVectorStore implements VectorStore {
     opts?: { threshold?: number; topK?: number },
   ): EmbeddingResult[] {
     const { threshold, topK = 10 } = opts ?? {};
+    if (this.hnsw.nodes.size === 0) {
+      return [];
+    }
     const nodes = this.hnsw.search(embedding, topK);
     if (threshold !== undefined) {
       return nodes.filter((node) => node.similarity > threshold);

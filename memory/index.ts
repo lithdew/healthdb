@@ -21,7 +21,7 @@ export interface Memory {
 }
 
 export class MemoryStore {
-  private vector: VectorStore;
+  private vector: HNSWVectorStore;
   private db: DB;
   private embedder: Embedder;
 
@@ -30,7 +30,7 @@ export class MemoryStore {
     embedder,
     db,
   }: {
-    vector: VectorStore;
+    vector: HNSWVectorStore;
     embedder: Embedder;
     db: DB;
   }) {
@@ -56,14 +56,12 @@ export class MemoryStore {
       async start(controller) {
         const parser = createParser({
           onEvent(event) {
-            console.info("recevied event");
             controller.enqueue(JSON.parse(event.data));
           },
         });
 
         // @ts-expect-error
         for await (const chunk of stream) {
-          console.info(chunk);
           parser.feed(chunk);
         }
 
@@ -253,10 +251,6 @@ export class MemoryStore {
       console.info({
         actual: { ...action, id: tempIdMappings.get(action.id)! },
       });
-      const memoryId = tempIdMappings.get(action.id);
-      if (memoryId === undefined) {
-        throw new Error("hallucation happened, the ids are unsynced");
-      }
       switch (action.action) {
         case UpdateMemoryAction.ADD: {
           console.info("adding memory");
@@ -308,8 +302,9 @@ export class MemoryStore {
     return returnedMemories;
   }
 
-  list(props?: { offset: number; limit: number }) {
-    return this.vector.list(props);
+  async list(props?: { offset: number; limit: number }) {
+    const memories = await this.db.memories.toArray();
+    const embeddings = this.vector.list();
   }
 }
 
