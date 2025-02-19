@@ -15,26 +15,27 @@ import type {
   AskWithGeminiBody,
   GeminiCountTokensResponse,
 } from "../ai/gemini";
-import React from "react";
-import { useMemoryStore } from "./lib/memory";
+import { GlobalStoreProvider, useMemoryStore } from "./store";
 
 function App() {
   return (
-    <AptosWalletAdapterProvider
-      autoConnect
-      dappConfig={{
-        network: Network.TESTNET,
-        aptosApiKeys: {
-          testnet: import.meta.env.VITE_APTOS_API_KEY_TESTNET,
-        },
-        aptosConnect: {
-          dappName: "HealthDB",
-          dappIcon: `${window.location.origin}/favicon.ico`,
-        },
-      }}
-    >
-      <Home />
-    </AptosWalletAdapterProvider>
+    <GlobalStoreProvider>
+      <AptosWalletAdapterProvider
+        autoConnect
+        dappConfig={{
+          network: Network.TESTNET,
+          aptosApiKeys: {
+            testnet: import.meta.env.VITE_APTOS_API_KEY_TESTNET,
+          },
+          aptosConnect: {
+            dappName: "HealthDB",
+            dappIcon: `${window.location.origin}/favicon.ico`,
+          },
+        }}
+      >
+        <Home />
+      </AptosWalletAdapterProvider>
+    </GlobalStoreProvider>
   );
 }
 
@@ -91,7 +92,8 @@ function LogoutPanel() {
 
 function Home() {
   const { account, isLoading, ...rest } = useWallet();
-  const [memory] = useMemoryStore();
+  const memory = useMemoryStore();
+
   return (
     <div className="h-dvh w-full bg-gray-50 flex flex-col">
       <div className="p-4 grow">
@@ -119,7 +121,7 @@ function Home() {
 
               // @ts-expect-error - This is a valid async generator function
               for await (const event of response.body.pipeThrough(
-                new TextDecoderStream("utf-8", { fatal: true }),
+                new TextDecoderStream("utf-8", { fatal: true })
               )) {
                 console.log(event);
               }

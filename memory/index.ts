@@ -1,16 +1,13 @@
-import { z } from "zod";
-import {
-  type Embedding,
-  type VectorStore,
-  type EmbeddingResult,
-} from "./types";
-import { Embedder } from "./embedder";
-import { UpdateMemoryAction } from "../ai/prompts";
-import { getRetrieveFactsPrompt, getUpdateMemoryPrompt } from "../ai/functions";
-import { HNSWVectorStore } from "./vector";
 import { createParser } from "eventsource-parser";
+import { z } from "zod";
+import { getRetrieveFactsPrompt, getUpdateMemoryPrompt } from "../ai/functions";
 import type { AskWithGeminiBody, GeminiEvent } from "../ai/gemini";
-import { createDatabase, type DB } from "../db";
+import { UpdateMemoryAction } from "../ai/prompts";
+import { Embedder } from "./embedder";
+import { type Embedding, type EmbeddingResult } from "./types";
+import { HNSWVectorStore } from "./vector";
+import type Dexie from "dexie";
+import type { DexieSchema } from "../db";
 
 export interface Memory {
   id: number;
@@ -22,7 +19,7 @@ export interface Memory {
 
 export class MemoryStore {
   private vector: HNSWVectorStore;
-  private db: DB;
+  private db: Dexie & DexieSchema;
   private embedder: Embedder;
 
   constructor({
@@ -32,7 +29,7 @@ export class MemoryStore {
   }: {
     vector: HNSWVectorStore;
     embedder: Embedder;
-    db: DB;
+    db: Dexie & DexieSchema;
   }) {
     this.vector = vector;
     this.embedder = embedder;
@@ -49,7 +46,7 @@ export class MemoryStore {
     }
 
     const stream = response.body.pipeThrough(
-      new TextDecoderStream("utf-8", { fatal: true }),
+      new TextDecoderStream("utf-8", { fatal: true })
     );
 
     const readable = new ReadableStream<GeminiEvent>({
@@ -60,7 +57,7 @@ export class MemoryStore {
           },
         });
 
-        // @ts-expect-error
+        // @ts-expect-error TODO: fix this
         for await (const chunk of stream) {
           parser.feed(chunk);
         }
@@ -69,7 +66,7 @@ export class MemoryStore {
       },
     });
 
-    // @ts-expect-error
+    // @ts-expect-error TODO: fix this
     for await (const chunk of readable) {
       const event = chunk as GeminiEvent;
       yield event;
@@ -158,7 +155,7 @@ export class MemoryStore {
   async readAllAndValidate<TSchema extends z.ZodTypeAny>(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     response: AsyncGenerator<GeminiEvent, any, unknown>,
-    schema: TSchema,
+    schema: TSchema
   ): Promise<z.infer<TSchema>> {
     const content = await this.readAll(response);
     return schema.parse(JSON.parse(content));
@@ -197,7 +194,7 @@ export class MemoryStore {
     let response = this.askWithGemini(retrieveFacts.body);
     const newRetrievedFacts = await this.readAllAndValidate(
       response,
-      retrieveFacts.schema,
+      retrieveFacts.schema
     );
 
     const newMessageEmbeddings: Record<string, Embedding> = {};
@@ -211,11 +208,11 @@ export class MemoryStore {
         : [];
       for (const memory of memories.filter((m) => m !== undefined)) {
         const vector = relatedEmbeddings.find(
-          (v) => v.id === memory.id,
+          (v) => v.id === memory.id
         )?.vector;
         if (vector === undefined) {
           throw new Error(
-            `unexpected error here: ${memory}, ${relatedEmbeddings}`,
+            `unexpected error here: ${memory}, ${relatedEmbeddings}`
           );
         }
         retrievedOldMemories.push({
@@ -234,13 +231,13 @@ export class MemoryStore {
 
     const updateMemoryPrompt = getUpdateMemoryPrompt(
       retrievedOldMemories,
-      newRetrievedFacts.facts,
+      newRetrievedFacts.facts
     );
 
     response = this.askWithGemini(updateMemoryPrompt.body);
     const newMemoriesWithActions = await this.readAllAndValidate(
       response,
-      updateMemoryPrompt.schema,
+      updateMemoryPrompt.schema
     );
 
     const returnedMemories: Memory[] = [];
@@ -307,11 +304,3 @@ export class MemoryStore {
     const embeddings = this.vector.list();
   }
 }
-
-export const createMemoryStore = async () => {
-  const embedder = new Embedder();
-  const db = await createDatabase();
-  const vector = new HNSWVectorStore(db, 384);
-  const memory = new MemoryStore({ vector, embedder, db });
-  return memory;
-};

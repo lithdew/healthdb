@@ -1,6 +1,6 @@
-import { Dexie, type EntityTable } from "dexie";
-import { Node } from "../hnsw/hnsw";
+import { type EntityTable } from "dexie";
 import type { AskWithGeminiBody, GeminiEvent } from "../ai/gemini";
+import { Node } from "../hnsw/hnsw";
 
 interface Measurement {
   id: number;
@@ -30,29 +30,10 @@ interface Event {
   chunks: GeminiEvent["candidates"];
 }
 
-interface Tables {
+export interface DexieSchema {
   hnswNodes: EntityTable<Node, "id">;
   measurements: EntityTable<Measurement, "id">;
   conversations: EntityTable<Conversation, "id">;
   memories: EntityTable<Memory, "id">;
   events: EntityTable<Event, "id">;
-}
-
-export type DB = Dexie & Tables;
-
-let db: DB | null = null;
-
-export async function createDatabase() {
-  if (db !== null) return db;
-  db = new Dexie("my-db") as DB;
-  db.version(1).stores({
-    hnswNodes: "++id",
-    measurements: "++id",
-    conversations: "++id",
-    memories: "++id",
-    events: "++id",
-  });
-
-  await db.open();
-  return db;
 }

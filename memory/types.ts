@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { z } from "zod";
 
 export type Embedding = number[] | Float32Array;
@@ -20,7 +21,7 @@ export interface VectorStore {
   // returns records sorted by relevance
   search(
     embedding: Embedding,
-    opts?: { threshold?: number; topK?: number },
+    opts?: { threshold?: number; topK?: number }
   ): EmbeddingResult[];
   list(props?: { cursor?: string; limit?: number }): Promise<EmbeddingResult[]>;
 }

@@ -4,14 +4,14 @@ import "./index.css";
 import App from "./app.tsx";
 import { MemoryStoreProvider } from "./lib/memory.tsx";
 import { DBProvider } from "./lib/db.tsx";
-import { StoreProvider } from "./store/index.tsx";
+import { GlobalStoreProvider } from "./store.tsx";
 
 const Providers = ({ children }: React.PropsWithChildren) => {
   return (
     <DBProvider>
-      <StoreProvider>
+      <GlobalStoreProvider>
         <MemoryStoreProvider>{children}</MemoryStoreProvider>
-      </StoreProvider>
+      </GlobalStoreProvider>
     </DBProvider>
   );
 };
@@ -21,5 +21,5 @@ createRoot(document.getElementById("root")!).render(
     <Providers>
       <App />
     </Providers>
-  </StrictMode>,
+  </StrictMode>
 );

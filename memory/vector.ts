@@ -1,13 +1,14 @@
-import type { DB } from "../db";
+import type Dexie from "dexie";
+import type { DexieSchema } from "../db";
 import { cosineSimilarity, HNSW } from "../hnsw/hnsw";
 import type { Embedding, EmbeddingResult, VectorStore } from "./types";
 
 export class HNSWVectorStore implements VectorStore {
   hnsw: HNSW;
-  db: DB;
+  db: Dexie & DexieSchema;
   changed: boolean = false;
 
-  constructor(db: DB, dimension: number) {
+  constructor(db: Dexie & DexieSchema, dimension: number) {
     this.db = db;
     this.hnsw = new HNSW({
       efConstruction: 200,
@@ -57,7 +58,7 @@ export class HNSWVectorStore implements VectorStore {
 
   search(
     embedding: Embedding,
-    opts?: { threshold?: number; topK?: number },
+    opts?: { threshold?: number; topK?: number }
   ): EmbeddingResult[] {
     const { threshold, topK = 10 } = opts ?? {};
     if (this.hnsw.nodes.size === 0) {
