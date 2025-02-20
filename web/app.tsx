@@ -28,6 +28,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { outdent } from "outdent";
 import Markdown from "react-markdown";
 import { useGlobals } from "./store";
+import { motion } from "motion/react";
 
 function App() {
   const [queryClient] = useState(new QueryClient());
@@ -155,13 +156,34 @@ function ChatHistoryList() {
   });
 
   return (
-    <div>
+    <div className="flex flex-col-reverse gap-6">
       {(messages ?? []).map((message) => (
-        <div key={message.id}>
-          {message.role}: <Markdown>{message.text}</Markdown>
-          <ResearchPanel messageId={message.id} />
-        </div>
+        <ChatMessage key={message.id} messageId={message.id} />
+        // <ResearchPanel messageId={message.id} />
       ))}
+    </div>
+  );
+}
+
+function ChatMessage({ messageId }: { messageId: string }) {
+  const db = useDexie();
+  const message = useLiveQuery(async () => {
+    return db.messages.get(messageId);
+  });
+
+  console.log(messageId);
+
+  if (message === undefined) {
+    return <div>Message {messageId} not found</div>;
+  }
+
+  return (
+    <div
+      className={`w-1/2 bg-zinc-200 rounded-md p-3 ${
+        message.role === "model" ? "self-start ml-4 mt-4" : "self-end mr-4 mt-4"
+      }`}
+    >
+      <Markdown>{message.text}</Markdown>
     </div>
   );
 }
@@ -171,151 +193,54 @@ function Home() {
   const account = useGlobalStore((state) => state.account);
   const memory = useMemoryStore();
   const store = useGlobals();
+  const status = useGlobalStore((state) => state.status);
+
+  const [value, setValue] = useState("");
 
   return (
-    <div className="h-dvh w-full bg-gray-50 flex flex-col">
-      <div className="p-4 grow">
-        <div>Hello world</div>
-        <div className="grid gap-2">
-          <LogoutPanel />
-          <button
-            className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
-            onClick={async () => {
-              const response = await fetch("/ask", {
-                method: "POST",
-                body: JSON.stringify({
-                  contents: [
-                    { role: "user", parts: [{ text: "Hi! How are you?" }] },
-                  ],
-                } satisfies AskWithGeminiBody),
-              });
-
-              // @ts-expect-error - This is a valid async generator function
-              for await (const event of response.body.pipeThrough(
-                new TextDecoderStream("utf-8", { fatal: true })
-              )) {
-                console.log(event);
-              }
-            }}
-          >
-            stream example prompt
-          </button>
-          <button
-            className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
-            onClick={async () => {
-              memory?.add("hello i love chocolate");
-            }}
-          >
-            add memory example
-          </button>
-          <button
-            className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
-            onClick={async () => {
-              const memories = await memory?.list();
-              console.info(memories);
-            }}
-          >
-            list memories
-          </button>
-          <button
-            className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
-            onClick={async () => {
-              await store.askAndSaveToMemory(
-                "I drank too much hot chocolate, now my blood sugar is feeling high, i feel sick"
-              );
-            }}
-          >
-            Test messageitem
-          </button>
-          <button
-            className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
-            onClick={async () => {
-              const results = await memory.search("hot chocolate");
-              console.info(results);
-            }}
-          >
-            Search for results
-          </button>
-          <button
-            className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
-            onClick={async () => {
-              const response = await fetch("/tokens", {
-                method: "POST",
-                body: JSON.stringify({
-                  contents: [
-                    { role: "user", parts: [{ text: "Hi! How are you?" }] },
-                  ],
-                } satisfies AskWithGeminiBody),
-              });
-
-              const result: GeminiCountTokensResponse = await response.json();
-
-              console.log(result);
-            }}
-          >
-            count tokens
-          </button>
-          <button
-            className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
-            onClick={async () => {
-              const serializer = new Serializer();
-              new FixedBytes(ABI.address).serialize(serializer);
-              new MoveString("token").serialize(serializer);
-              new MoveString("ReceiptBody").serialize(serializer);
-              account.accountAddress.serialize(serializer);
-              new FixedBytes(HEALTH_AI_AGENT_CREATOR_ADDRESS).serialize(
-                serializer
-              );
-              new U64(10_000_000_000n).serialize(serializer);
-
-              const signature = account.sign(serializer.toUint8Array());
-              console.log(signature.toString());
-            }}
-          >
-            sign message
-          </button>
-
-          <button
-            className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
-            onClick={async () => {
-              const PROMPT = outdent`
-                I have a heart pressure monitor. I did two readings. It's 1:05AM.
-
-                First reading: sys. 111, dia. 68, pulse 76.
-                Second reading: sys. 114, dia. 66, pulse 74.
-
-                Weight is 88kg. I am male. 27 years old.
-
-                Indicate to me if these readings indicate any potential health concerns and if there is anything I can or should do about it.
-
-                I run 5km every day or two. It takes me on average 34 minutes to complete a 5k.
-              `;
-
-              await db.messages.add({
-                id: crypto.randomUUID(),
-                createdAt: Date.now(),
-                role: "user",
-                text: PROMPT,
-              });
-
-              await store.research();
-            }}
-          >
-            do da research
-          </button>
-        </div>
-
-        <div>
-          <ChatHistoryList />
-        </div>
-      </div>
+    <div className="h-dvh max-h-dvh w-full bg-gray-50 flex flex-col">
       <div className="p-4">
-        <textarea
-          className="p-6 rounded-md bg-gray-200 w-full field-sizing-content"
-          rows={4}
-          placeholder="What's on your mind?"
-        />
+        <h1 className="text-xl font-semibold">HealthDB</h1>
       </div>
+      <div className="grow flex-1 min-h-0 overflow-y-auto">
+        <ChatHistoryList />
+      </div>
+      <motion.div className="pt-4">
+        <motion.div whileHover={{ padding: 0 }} className="p-4">
+          <div className="bg-gray-200 w-full rounded-md p-6 flex gap-3">
+            <motion.textarea
+              className="p-6 rounded-md bg-gray-200 w-full field-sizing-content resize-none outline-none"
+              rows={8}
+              placeholder="What's on your mind?"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+            />
+
+            <button
+              disabled={value.trim().length === 0 || status === "researching"}
+              className="bg-blue-500 text-white px-3 py-1 text-xl rounded-md cursor-pointer disabled:cursor-not-allowed"
+              onClick={async (e) => {
+                e.preventDefault();
+
+                const text = value.trim();
+
+                setValue("");
+
+                await db.messages.add({
+                  id: crypto.randomUUID(),
+                  role: "user",
+                  text,
+                  createdAt: Date.now(),
+                });
+
+                await store.research();
+              }}
+            >
+              {status === "researching" ? "Thinking..." : "Send"}
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }

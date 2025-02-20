@@ -1,6 +1,6 @@
 import { z } from "zod";
 export const geminiContentSchema = z.object({
-  role: z.enum(["user", "model"]),
+  role: z.enum(["user", "model", "system"]),
   parts: z.array(z.object({ text: z.string() })),
 });
 

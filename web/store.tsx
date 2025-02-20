@@ -258,11 +258,11 @@ async function visitResearchNode(
     children: current.children.map((c) => c.id),
   });
 
-  if (current.depth >= 2) {
+  if (current.depth >= 1) {
     return;
   }
 
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 2; i++) {
     const child: ResearchNode = {
       parentMessageId: current.parentMessageId,
       id: crypto.randomUUID(),
@@ -321,7 +321,7 @@ export class GlobalStore {
       throw new Error(`No history found`);
     }
 
-    const lastMessage = history.at(-1);
+    const lastMessage = history.at(0);
     if (lastMessage === undefined) {
       throw new Error(`No parent message found`);
     }
@@ -355,7 +355,7 @@ export class GlobalStore {
       await queue.onIdle();
 
       const maxNodes = await this.db.researchNodes
-        .where({ depth: 2, parentMessageId: lastMessage.id })
+        .where({ depth: 1, parentMessageId: lastMessage.id })
         .reverse()
         .limit(3)
         .sortBy("score");
@@ -379,16 +379,24 @@ export class GlobalStore {
 
       const response = askWithGemini({
         systemInstruction: {
-          role: "model" as const,
+          role: "system" as const,
           parts: [
             {
               text: outdent`
                 You are HealthDB, a comprehensive health data assistant designed to help users collect, organize, and analyze their health information.
-                These are the best example prompts of how you respond to the question of the user:
-                
-                ${maxNodeConversations.join("\n")}
-                
-                Use these example prompts as supportive detail in order to answer or fulfill the user's input.`,
+                Your primary goal is to act as an interactive health journal and guide that compiles the user’s medical history, fitness goals, wearable device readings, and other health data into a structured database.
+                Whenever needed, you ask specific follow-up questions to ensure that you have all the necessary information to provide useful, accurate guidance.
+                        
+                Please do NOT simply send the user off to a qualified healthcare professional.
+
+                Your goal is to help the user self-diagnose by:
+                1. asking only a few, smartly-chosen follow-up questions which the user could likely easily answer to better understand the user's health or come up with a preliminary diagnosis,
+                2. explaining why you asked these follow-up questions,
+                3. understanding the user's intentions and symptoms and medical history and background, and
+                4. providing them with as much comprehensive and explicit insight and information as possible so that they may learn and have better insight into their own health.
+
+                Healthcare professionals are busy people that do not always have the time or care to be able to ask follow-up questions and gather as much information as possible from the user,
+                leading to misdiagnosis or prescription errors which could sometimes lead to death. It is your job to prevent this from happening.`,
             },
           ],
         },
@@ -472,22 +480,6 @@ export class GlobalStore {
       ],
     });
   }
-
-  // async runMCTS(question: string) {
-  //   const rootNode = new MCTSNode([question]);
-
-  //   const bestResponse = await mctsSearch(rootNode, 500);
-  //   console.log(`AI: ${bestResponse}`);
-
-  //   const userPrompt = askWithGemini(
-  //     generateUserResponse([...rootNode.conversationState], bestResponse).body
-  //   );
-
-  //   const userResponse = await readAll(userPrompt);
-  //   console.log(`User: ${userResponse}`);
-
-  //   return bestResponse;
-  // }
 }
 
 const GlobalStoreContext = createContext<GlobalStore | null>(null);
