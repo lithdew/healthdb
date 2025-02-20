@@ -7,7 +7,7 @@ HealthDB is an AI agent that organizes, collates, and enriches your personal hea
 <img src="./assets/healthdb_memories.png" alt="HealthDB" />
 <img src="./assets/healthdb_measurements.png" alt="HealthDB" />
 
-
+https://github.com/user-attachments/assets/e4962b90-78a5-4f7f-a7bb-711475ac83c2
 
 
 Data is collected from a variety of sources, including your:
