@@ -214,6 +214,35 @@ function Home() {
   const store = useGlobals();
   const status = useGlobalStore((state) => state.status);
 
+  const query = useQuery({
+    queryKey: ["coins"],
+    queryFn: async () => {
+      const response = await aptos.getCurrentFungibleAssetBalances({
+        options: {
+          where: {
+            owner_address: {
+              _eq: account.accountAddress.toString(),
+            },
+          },
+        },
+      });
+
+      for (const balance of response) {
+        if (
+          balance.asset_type === HEALTH_TOKEN_ADDRESS &&
+          balance.amount !== undefined
+        ) {
+          return BigInt(balance.amount);
+        }
+      }
+
+      return 0n;
+    },
+    placeholderData: keepPreviousData,
+    select: (data) =>
+      tokenFormatter.format(new Decimal(data.toString()).div(1e9).toNumber()),
+  });
+
   const [value, setValue] = useState("");
 
   return (
@@ -222,7 +251,9 @@ function Home() {
         <h1 className="text-xl font-semibold">HealthDB</h1>
         <div>
           <button
-            className="cursor-pointer bg-gray-300 rounded-md px-2 py-1 text-sm"
+            className={`cursor-pointer bg-gray-300 rounded-md px-2 py-1 text-sm ${
+              query.isLoading ? "animate-pulse" : ""
+            }`}
             onClick={async () => {
               const serializer = new Serializer();
               new FixedBytes(ABI.address).serialize(serializer);
@@ -238,7 +269,9 @@ function Home() {
               console.log(signature.toString());
             }}
           >
-            $HEALTH tokens deposited
+            {query.isLoading
+              ? "Loading..."
+              : `${query.data} $HEALTH tokens deposited`}
           </button>
         </div>
       </div>
