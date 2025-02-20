@@ -260,10 +260,71 @@ function Home() {
             </motion.button>
 
             <MeasurementDrawer />
+
+            <MemoriesDrawer />
           </div>
         </motion.div>
       </motion.div>
     </div>
+  );
+}
+
+function MemoriesDrawer() {
+  const db = useDexie();
+
+  const memories = useLiveQuery(async () => {
+    return db.memories.orderBy("createdAt").reverse().toArray();
+  });
+
+  console.log(memories);
+
+  return (
+    <Drawer.Root>
+      <Drawer.Trigger asChild>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          className="bg-blue-200 text-black p-4 text-xl rounded-md cursor-pointer"
+        >
+          Memories
+        </motion.button>
+      </Drawer.Trigger>
+      <Drawer.Portal>
+        <Drawer.Overlay className="fixed inset-0 bg-black/40" />
+        <Drawer.Content className="bg-zinc-100 flex flex-col rounded-t-[10px] h-[60%] mt-24 fixed bottom-0 left-0 right-0">
+          <div className="p-4 bg-white rounded-t-[10px] flex-1">
+            <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-zinc-300 mb-8" />
+            <div className="mx-auto">
+              <Drawer.Title className="font-medium mb-4">
+                Your memories
+              </Drawer.Title>
+
+              <div className="space-y-6 overflow-y-auto">
+                <div className="grid grid-cols-2 bg-slate-200 rounded-md border divide-y">
+                  <div className="col-span-full grid grid-cols-subgrid divide-x text-xs font-semibold">
+                    <div className="px-2 py-1">Recorded At</div>
+                    <div className="px-2 py-1">Fact</div>
+                  </div>
+
+                  {(memories ?? []).map((memory, i) => {
+                    return (
+                      <div
+                        key={i}
+                        className="col-span-full grid grid-cols-subgrid divide-x text-sm"
+                      >
+                        <div className="px-2 py-1">
+                          {new Date(memory.createdAt).toLocaleString()}
+                        </div>
+                        <div className="px-2 py-1">{memory.content}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
   );
 }
 
@@ -286,7 +347,7 @@ function MeasurementDrawer() {
       </Drawer.Trigger>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/40" />
-        <Drawer.Content className="bg-zinc-100 flex flex-col rounded-t-[10px] h-[96%] mt-24 fixed bottom-0 left-0 right-0">
+        <Drawer.Content className="bg-zinc-100 flex flex-col rounded-t-[10px] h-[60%] mt-24 fixed bottom-0 left-0 right-0">
           <div className="p-4 bg-white rounded-t-[10px] flex-1">
             <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-zinc-300 mb-8" />
             <div className="mx-auto">
@@ -294,29 +355,31 @@ function MeasurementDrawer() {
                 Your measurements
               </Drawer.Title>
 
-              <div className="grid grid-cols-5 bg-slate-200 rounded-md border divide-y">
-                <div className="col-span-full grid grid-cols-subgrid divide-x text-xs">
-                  <div className="px-2 py-1">Recorded At</div>
-                  <div className="px-2 py-1">Type</div>
-                  <div className="px-2 py-1">Unit</div>
-                  <div className="px-2 py-1">Value</div>
-                </div>
+              <div className="space-y-6 overflow-y-auto">
+                <div className="grid grid-cols-5 bg-slate-200 rounded-md border divide-y">
+                  <div className="col-span-full grid grid-cols-subgrid divide-x text-xs font-semibold">
+                    <div className="px-2 py-1">Recorded At</div>
+                    <div className="px-2 py-1">Type</div>
+                    <div className="px-2 py-1">Unit</div>
+                    <div className="px-2 py-1">Value</div>
+                  </div>
 
-                {(measurements ?? []).map((measurement, i) => {
-                  return (
-                    <div
-                      key={i}
-                      className="col-span-full grid grid-cols-subgrid divide-x text-sm"
-                    >
-                      <div className="px-2 py-1">
-                        {new Date(measurement.createdAt).toLocaleString()}
+                  {(measurements ?? []).map((measurement, i) => {
+                    return (
+                      <div
+                        key={i}
+                        className="col-span-full grid grid-cols-subgrid divide-x text-sm"
+                      >
+                        <div className="px-2 py-1">
+                          {new Date(measurement.createdAt).toLocaleString()}
+                        </div>
+                        <div className="px-2 py-1">{measurement.type}</div>
+                        <div className="px-2 py-1">{measurement.unit}</div>
+                        <div className="px-2 py-1">{measurement.value}</div>
                       </div>
-                      <div className="px-2 py-1">{measurement.type}</div>
-                      <div className="px-2 py-1">{measurement.unit}</div>
-                      <div className="px-2 py-1">{measurement.value}</div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
