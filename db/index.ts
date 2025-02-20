@@ -32,10 +32,9 @@ interface Event {
 }
 
 interface ResearchNode {
+  parentMessageId: string;
   id: string;
   depth: number;
-  messageId: string;
-  parentId?: string;
   history: { role: "model" | "user"; text: string }[];
   children: string[];
   status: "generating" | "completed";
@@ -45,6 +44,13 @@ interface ResearchNode {
   score?: number;
 }
 
+interface Message {
+  id: string;
+  role: "model" | "user";
+  text: string;
+  createdAt: number;
+}
+
 export interface DexieSchema {
   hnswNodes: EntityTable<Node, "id">;
   measurements: EntityTable<Measurement, "id">;
@@ -52,4 +58,5 @@ export interface DexieSchema {
   memories: EntityTable<Memory, "id">;
   events: EntityTable<Event, "id">;
   researchNodes: EntityTable<ResearchNode, "id">;
+  messages: EntityTable<Message, "id">;
 }

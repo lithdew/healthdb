@@ -1,19 +1,22 @@
+import { AccountUtils, Ed25519Account } from "@aptos-labs/ts-sdk";
 import { useStore } from "@tanstack/react-store";
 import { Store } from "@tanstack/store";
+import { zodToVertexSchema } from "@techery/zod-to-vertex-schema";
 import Dexie from "dexie";
+import { outdent } from "outdent";
+import PQueue from "p-queue";
 import { createContext, useContext, useMemo, useState } from "react";
+import { z } from "zod";
+import type { GeminiEvent } from "../ai/gemini";
+import {
+  askWithGemini,
+  readAll,
+  readAllAndValidate,
+} from "../ai/gemini.client";
 import { type DexieSchema } from "../db";
-import { HNSWVectorStore } from "../memory/vector";
 import { MemoryStore } from "../memory";
 import { Embedder } from "../memory/embedder";
-import { AccountUtils, Ed25519Account } from "@aptos-labs/ts-sdk";
-import { askWithGemini, readAll } from "../ai/gemini.client";
-import { outdent } from "outdent";
-import type { GeminiEvent } from "../ai/gemini";
-import PQueue from "p-queue";
-import { readAllAndValidate } from "../ai/gemini.client";
-import { zodToVertexSchema } from "@techery/zod-to-vertex-schema";
-import { z } from "zod";
+import { HNSWVectorStore } from "../memory/vector";
 
 const SCORER_PROMPT = outdent`
 HealthDB is a comprehensive health data assistant designed to help users collect, organize, and analyze their health information.
@@ -99,7 +102,7 @@ const USER_PROMPT = outdent`
 `;
 
 async function generateScorerResponse(
-  history: { role: "model" | "user"; text: string }[],
+  history: { role: "model" | "user"; text: string }[]
 ) {
   const collated = history
     .map((h) => `${h.role[0].toUpperCase() + h.role.slice(1)}: ${h.text}`)
@@ -139,7 +142,7 @@ async function generateScorerResponse(
 
 async function* generateAiResponse(
   history: { role: "model" | "user"; text: string }[],
-  message: string,
+  message: string
 ) {
   const collated = history
     .map((h) => `${h.role[0].toUpperCase() + h.role.slice(1)}: ${h.text}`)
@@ -163,7 +166,7 @@ async function* generateAiResponse(
 
 async function* generateUserResponse(
   history: { role: "model" | "user"; text: string }[],
-  message: string,
+  message: string
 ) {
   const collated = history
     .map((h) => `${h.role[0].toUpperCase() + h.role.slice(1)}: ${h.text}`)
@@ -186,6 +189,7 @@ async function* generateUserResponse(
 }
 
 interface ResearchNode {
+  parentMessageId: string;
   id: string;
   depth: number;
   score?: number;
@@ -210,11 +214,9 @@ interface State {
 
 async function visitResearchNode(
   db: Dexie & DexieSchema,
-  messageId: string,
-  parentId: string | undefined,
   queue: PQueue,
   current: ResearchNode,
-  prompt: string,
+  prompt: string
 ) {
   const currentRole =
     current.depth % 2 === 0 ? ("model" as const) : ("user" as const);
@@ -223,10 +225,9 @@ async function visitResearchNode(
     currentRole === "model" ? generateAiResponse : generateUserResponse;
 
   db.researchNodes.add({
+    parentMessageId: current.parentMessageId,
     id: current.id,
-    messageId,
     depth: current.depth,
-    parentId: parentId,
     history: structuredClone(current.history),
     children: current.children.map((c) => c.id),
     status: current.status,
@@ -235,11 +236,6 @@ async function visitResearchNode(
     createdAt: current.createdAt,
   });
 
-  // state.setState((state) => ({
-  //   ...state,
-  //   nodes: new Map(state.nodes).set(current.id, structuredClone(current)),
-  // }));
-
   for await (const event of generateResponse(current.history, prompt)) {
     current.events.push(event);
     const text = event.candidates[0]?.content?.parts?.[0]?.text;
@@ -247,7 +243,7 @@ async function visitResearchNode(
       current.buffer += text;
     }
 
-    db.researchNodes.update(current.id, {
+    db.researchNodes.update([current.parentMessageId, current.id], {
       ...current,
       children: current.children.map((c) => c.id),
       events: [...current.events, event],
@@ -257,7 +253,7 @@ async function visitResearchNode(
 
   current.status = "completed";
 
-  db.researchNodes.update(current.id, {
+  db.researchNodes.update([current.parentMessageId, current.id], {
     ...current,
     children: current.children.map((c) => c.id),
   });
@@ -268,6 +264,7 @@ async function visitResearchNode(
 
   for (let i = 0; i < 3; i++) {
     const child: ResearchNode = {
+      parentMessageId: current.parentMessageId,
       id: crypto.randomUUID(),
       depth: current.depth + 1,
       history: [
@@ -284,7 +281,7 @@ async function visitResearchNode(
     const score = await generateScorerResponse(child.history);
     console.info({ score });
     child.score = score;
-    await db.researchNodes.update(child.id, {
+    await db.researchNodes.update([child.parentMessageId, child.id], {
       ...child,
       score,
       children: child.children.map((c) => c.id),
@@ -292,18 +289,11 @@ async function visitResearchNode(
     current.children.push(child);
 
     queue.add(async () => {
-      await visitResearchNode(
-        db,
-        messageId,
-        current.id,
-        queue,
-        child,
-        current.buffer,
-      );
+      await visitResearchNode(db, queue, child, current.buffer);
     });
   }
 
-  db.researchNodes.update(current.id, {
+  db.researchNodes.update([current.parentMessageId, current.id], {
     ...current,
     children: current.children.map((c) => c.id),
   });
@@ -316,89 +306,107 @@ export class GlobalStore {
   vector: HNSWVectorStore;
   memory: MemoryStore;
 
-  async research(prompt: string) {
+  async research() {
     if (this.state.state.status === "researching") {
       return;
     }
 
-    const messageId = crypto.randomUUID();
+    const history = await this.db.messages
+      .orderBy("createdAt")
+      .reverse()
+      .limit(10)
+      .toArray();
+
+    if (history.length === 0) {
+      throw new Error(`No history found`);
+    }
+
+    const lastMessage = history.at(-1);
+    if (lastMessage === undefined) {
+      throw new Error(`No parent message found`);
+    }
+    if (lastMessage.role !== "user") {
+      throw new Error(`The last message is not generated by the user.`);
+    }
 
     const queue = new PQueue();
-    this.state.setState((state) => ({ ...state, status: "researching" }));
 
-    const createdAt = Date.now();
+    this.state.setState((state) => ({ ...state, status: "researching" }));
 
     try {
       for (let i = 0; i < 3; i++) {
         const init: ResearchNode = {
+          parentMessageId: lastMessage.id,
           id: crypto.randomUUID(),
           depth: 0,
-          history: structuredClone(this.state.state.history),
+          history: structuredClone(history),
           children: [],
           status: "generating",
           events: [],
           buffer: "",
-          createdAt,
+          createdAt: Date.now(),
         };
 
         queue.add(async () => {
-          await visitResearchNode(
-            this.db,
-            messageId,
-            undefined,
-            queue,
-            init,
-            prompt,
-          );
+          await visitResearchNode(this.db, queue, init, lastMessage.text);
         });
       }
 
       await queue.onIdle();
 
       const maxNodes = await this.db.researchNodes
-        .where({ depth: 0, messageId })
+        .where({ depth: 2, parentMessageId: lastMessage.id })
         .reverse()
+        .limit(3)
         .sortBy("score");
 
-      const bestPrompts = await Promise.all(
-        maxNodes.map(async (node) => {
-          let currentNode = node;
-          while (currentNode.parentId !== undefined) {
-            const parent = await this.db.researchNodes.get(
-              currentNode.parentId,
-            );
-            if (parent === undefined) {
-              throw new Error("invalid parent i d");
-            }
-            currentNode = parent;
-          }
-          return currentNode.buffer;
-        }),
-      );
-      console.info({ bestPrompts });
+      console.log(maxNodes);
+
+      const maxNodeConversations: string[] = [];
+
+      for (const node of maxNodes) {
+        const chat = [...node.history, { role: "model", text: node.buffer }];
+        maxNodeConversations.push(
+          chat
+            .map(
+              (c) => `${c.role[0]!.toUpperCase() + c.role.slice(1)}: ${c.text}`
+            )
+            .join("\n")
+        );
+      }
+
+      console.log(maxNodeConversations);
 
       const response = askWithGemini({
         systemInstruction: {
           role: "model" as const,
           parts: [
             {
-              text: `You are HealthDB, a comprehensive health data assistant designed to help users collect, organize, and analyze their health information. These are the best example prompts of how you respond to the question of the user.: ${bestPrompts}`,
+              text: outdent`
+                You are HealthDB, a comprehensive health data assistant designed to help users collect, organize, and analyze their health information.
+                These are the best example prompts of how you respond to the question of the user:
+                
+                ${maxNodeConversations.join("\n")}
+                
+                Use these example prompts as supportive detail in order to answer or fulfill the user's input.`,
             },
           ],
         },
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        contents: [{ role: "user", parts: [{ text: lastMessage.text }] }],
       });
 
       const bestPrompt = await readAll(response);
 
-      await this.db.conversations.add({
-        id: messageId,
-        question: prompt,
-        response: bestPrompt,
-        createdAt,
+      console.log("The best prompt:", bestPrompt);
+
+      await this.db.messages.add({
+        id: crypto.randomUUID(),
+        role: "model",
+        text: bestPrompt,
+        createdAt: Date.now(),
       });
 
-      this.memory.add(prompt);
+      void this.memory.add(bestPrompt);
 
       return bestPrompt;
     } finally {
@@ -417,7 +425,7 @@ export class GlobalStore {
       account = Ed25519Account.generate();
       window.localStorage.setItem(
         "healthdb_keys",
-        AccountUtils.toHexString(account),
+        AccountUtils.toHexString(account)
       );
     } else {
       account = AccountUtils.ed25519AccountFromHex(encoded);
@@ -438,7 +446,8 @@ export class GlobalStore {
       conversations: "++id",
       memories: "++id",
       events: "++id",
-      researchNodes: "id,depth,messageId",
+      researchNodes: "[parentMessageId+id],&id,depth,createdAt,score,status",
+      messages: "id,createdAt,role",
     });
     void this.db.open();
 
@@ -498,7 +507,7 @@ export const GlobalStoreProvider = ({ children }: React.PropsWithChildren) => {
 };
 
 export function useGlobalStore<TSelected = GlobalStore["state"]>(
-  selector?: (state: GlobalStore["state"]["state"]) => TSelected,
+  selector?: (state: GlobalStore["state"]["state"]) => TSelected
 ): TSelected {
   const store = useContext(GlobalStoreContext);
   if (store === null) {

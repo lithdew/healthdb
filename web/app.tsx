@@ -103,27 +103,35 @@ function LogoutPanel() {
   );
 }
 
-function ResearchPanel() {
+function ResearchPanel({ messageId }: { messageId: string }) {
   const db = useDexie();
   const nodeIds = useLiveQuery(async () => {
-    const collection = db.researchNodes.toCollection();
+    const collection = db.researchNodes.where({ parentMessageId: messageId });
 
-    return await collection.primaryKeys();
+    return (await collection.primaryKeys()) as [messageId: string, id: string];
   });
+
+  console.log(nodeIds);
 
   return (
     <div>
-      {(nodeIds ?? []).map((id) => (
-        <ResearchNodePanel key={id} nodeId={id} />
+      {(nodeIds ?? []).map(([, id]) => (
+        <ResearchNodePanel key={id} messageId={messageId} nodeId={id} />
       ))}
     </div>
   );
 }
 
-function ResearchNodePanel({ nodeId }: { nodeId: string }) {
+function ResearchNodePanel({
+  messageId,
+  nodeId,
+}: {
+  messageId: string;
+  nodeId: string;
+}) {
   const db = useDexie();
   const node = useLiveQuery(async () => {
-    return db.researchNodes.get(nodeId);
+    return db.researchNodes.get({ parentMessageId: messageId, id: nodeId });
   });
 
   if (node === undefined) {
@@ -133,14 +141,33 @@ function ResearchNodePanel({ nodeId }: { nodeId: string }) {
   return (
     <div>
       <code>
-        {node.id} ({node.depth}) ({node.status})
+        {node.id} ({node.depth}) ({node.status}) (Score: {node.score})
       </code>
       <Markdown>{node.buffer}</Markdown>
     </div>
   );
 }
 
+function ChatHistoryList() {
+  const db = useDexie();
+  const messages = useLiveQuery(async () => {
+    return db.messages.orderBy("createdAt").reverse().toArray();
+  });
+
+  return (
+    <div>
+      {(messages ?? []).map((message) => (
+        <div key={message.id}>
+          {message.role}: <Markdown>{message.text}</Markdown>
+          <ResearchPanel messageId={message.id} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Home() {
+  const db = useDexie();
   const account = useGlobalStore((state) => state.account);
   const memory = useMemoryStore();
   const store = useGlobals();
@@ -165,7 +192,7 @@ function Home() {
 
               // @ts-expect-error - This is a valid async generator function
               for await (const event of response.body.pipeThrough(
-                new TextDecoderStream("utf-8", { fatal: true }),
+                new TextDecoderStream("utf-8", { fatal: true })
               )) {
                 console.log(event);
               }
@@ -194,7 +221,7 @@ function Home() {
             className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
             onClick={async () => {
               await store.askAndSaveToMemory(
-                "I drank too much hot chocolate, now my blood sugar is feeling high, i feel sick",
+                "I drank too much hot chocolate, now my blood sugar is feeling high, i feel sick"
               );
             }}
           >
@@ -237,7 +264,7 @@ function Home() {
               new MoveString("ReceiptBody").serialize(serializer);
               account.accountAddress.serialize(serializer);
               new FixedBytes(HEALTH_AI_AGENT_CREATOR_ADDRESS).serialize(
-                serializer,
+                serializer
               );
               new U64(10_000_000_000n).serialize(serializer);
 
@@ -264,8 +291,14 @@ function Home() {
                 I run 5km every day or two. It takes me on average 34 minutes to complete a 5k.
               `;
 
-              const node = await store.research(PROMPT);
-              console.info(node);
+              await db.messages.add({
+                id: crypto.randomUUID(),
+                createdAt: Date.now(),
+                role: "user",
+                text: PROMPT,
+              });
+
+              await store.research();
             }}
           >
             do da research
@@ -273,7 +306,7 @@ function Home() {
         </div>
 
         <div>
-          <ResearchPanel />
+          <ChatHistoryList />
         </div>
       </div>
       <div className="p-4">
