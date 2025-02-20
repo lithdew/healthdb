@@ -269,9 +269,7 @@ function Home() {
               console.log(signature.toString());
             }}
           >
-            {query.isLoading
-              ? "Loading..."
-              : `${query.data} $HEALTH tokens deposited`}
+            {query.isLoading ? "Loading..." : `${query.data} $HEALTH`}
           </button>
         </div>
       </div>
