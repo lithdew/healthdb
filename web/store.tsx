@@ -33,6 +33,7 @@ HealthDB's goal is to help the user self-diagnose by:
 Healthcare professionals are busy people that do not always have the time or care to be able to ask follow-up questions and gather as much information as possible from the user,
 leading to misdiagnosis or prescription errors which could sometimes lead to death. It is HealthDB's job to prevent this from happening.
 
+{{CURRENT_CONVERSATION}}
 
 You are a helpful assistant that critically analyzes how well or how poorly HealthDB achieves it's goal.
 
@@ -61,7 +62,7 @@ const USER_PROMPT = outdent`
   You are a user interacting with HealthDB, a health data assistant. Your goal is to provide relevant follow-up information while maintaining a natural conversation.
 
   ### CONTEXT:
-  The assistant has just responded to your initial inquiry about your blood pressure readings, weight, and fitness habits. It may have:
+  HealthDB has just responded to your initial inquiry. It may have:
   - Provided an assessment of your readings.
   - Asked for additional health-related details (e.g., symptoms, sleep patterns, stress levels, diet, or family history).
   - Suggested possible explanations and asked clarifying questions.
@@ -87,13 +88,7 @@ const USER_PROMPT = outdent`
     _"I can track my blood pressure over the next few weeks. What patterns should I look out for?"_
 
 
-  <current-conversation>
-  {{CURRENT_CONVERSATION}}
-  </current-conversation>
-
-  ### CONVERSATION CONTINUATION:
-
-  Based on the <current-message> Respond as a user in a way that **extends the conversation naturally**, providing **useful follow-ups, additional context, or new concerns**.
+  Respond as a user in a way that **extends the conversation naturally**, providing **useful follow-ups, additional context, or new concerns**.
 `;
 
 async function generateScorerResponse(
@@ -139,12 +134,10 @@ async function* generateAiResponse(
   history: { role: "model" | "user"; text: string }[],
   message: string
 ) {
-  const prompt = AI_PROMPT;
-
   yield* askWithGemini({
     systemInstruction: {
-      role: "model",
-      parts: [{ text: prompt }],
+      role: "system",
+      parts: [{ text: AI_PROMPT }],
     },
     contents: [
       ...history.map((h) => ({
@@ -163,21 +156,19 @@ async function* generateUserResponse(
   history: { role: "model" | "user"; text: string }[],
   message: string
 ) {
-  const collated = history
-    .map((h) => `${h.role[0].toUpperCase() + h.role.slice(1)}: ${h.text}`)
-    .join("\n");
-
-  const prompt = USER_PROMPT.replace("{{CURRENT_CONVERSATION}}", collated);
-
   yield* askWithGemini({
     systemInstruction: {
-      role: "model",
-      parts: [{ text: prompt }],
+      role: "system",
+      parts: [{ text: USER_PROMPT }],
     },
     contents: [
+      ...history.map((h) => ({
+        role: h.role,
+        parts: [{ text: h.text }],
+      })),
       {
         role: "user",
-        parts: [{ text: `<current-message>${message}</current-message>` }],
+        parts: [{ text: message }],
       },
     ],
   });
@@ -215,6 +206,9 @@ async function visitResearchNode(
 ) {
   const currentRole =
     current.depth % 2 === 0 ? ("model" as const) : ("user" as const);
+
+  const oppositeRole =
+    currentRole === "model" ? ("user" as const) : ("model" as const);
 
   const generateResponse =
     currentRole === "model" ? generateAiResponse : generateUserResponse;
@@ -264,7 +258,7 @@ async function visitResearchNode(
       depth: current.depth + 1,
       history: [
         ...structuredClone(current.history),
-        { role: currentRole, text: prompt },
+        { role: oppositeRole, text: prompt },
       ],
       children: [],
       status: "generating",
@@ -308,7 +302,6 @@ export class GlobalStore {
 
     const history = await this.db.messages
       .orderBy("createdAt")
-      .reverse()
       .limit(10)
       .toArray();
 
@@ -316,7 +309,7 @@ export class GlobalStore {
       throw new Error(`No history found`);
     }
 
-    const lastMessage = history.at(0);
+    const lastMessage = history.at(-1);
     if (lastMessage === undefined) {
       throw new Error(`No parent message found`);
     }
@@ -334,7 +327,7 @@ export class GlobalStore {
           parentMessageId: lastMessage.id,
           id: crypto.randomUUID(),
           depth: 0,
-          history: structuredClone(history.reverse()),
+          history: structuredClone(history.slice(0, -1)),
           children: [],
           status: "generating",
           events: [],
@@ -403,13 +396,15 @@ export class GlobalStore {
       // });
 
       // const bestPrompt = await readAll(response);
-      
+
       // console.log("The best prompt:", bestPrompt);
 
       console.log(maxNodes);
 
       console.log("HERE", maxNodes.at(0)!);
-      const bestPrompt = maxNodes.at(0)!.buffer;
+      const bestPrompt = maxNodes
+        .at(0)!
+        .history.at(-maxNodes.at(0)!.depth + 1)!.text;
 
       await this.db.messages.add({
         id: crypto.randomUUID(),

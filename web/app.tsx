@@ -306,6 +306,8 @@ function Home() {
 
                 setValue("");
 
+                const amount = 10_000_000_000n;
+
                 const serializer = new Serializer();
                 new FixedBytes(ABI.address).serialize(serializer);
                 new MoveString("token").serialize(serializer);
@@ -314,13 +316,17 @@ function Home() {
                 new FixedBytes(HEALTH_AI_AGENT_CREATOR_ADDRESS).serialize(
                   serializer
                 );
-                new U64(10_000_000_000n).serialize(serializer);
+                new U64(amount).serialize(serializer);
 
                 const signature = account.sign(serializer.toUint8Array());
 
                 void fetch("/receipt", {
                   method: "POST",
-                  body: signature.toString(),
+                  body: JSON.stringify({
+                    signature: signature.toString(),
+                    address: account.accountAddress.toString(),
+                    amount: amount.toString(),
+                  }),
                 });
 
                 await db.messages.add({

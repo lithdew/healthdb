@@ -30,7 +30,10 @@ db.exec(outdent`
 
 db.exec(outdent`
   create table if not exists receipts(
-    signature text primary key not null
+    signature text primary key not null,
+    address text not null,
+    amount text not null,
+    created_at text not null default (strftime('%s', 'now'))
   );
 `);
 
@@ -44,11 +47,19 @@ export default async function handler({
   url: URL;
 }): Promise<Response | undefined> {
   if (req.method === "POST" && url.pathname === "/receipt") {
-    const signature = await req.text();
-    db.query("insert or replace into receipts (signature) values (?)").run(
-      signature
-    );
-    return Response.json({ signature });
+    const schema = z.object({
+      signature: z.string(),
+      address: z.string(),
+      amount: z.string(),
+    });
+    const result = schema.safeParse(await req.json());
+    if (!result.success) {
+      return Response.json(result.error, { status: 400 });
+    }
+    db.query(
+      "insert or replace into receipts (signature, address, amount) values (?, ?, ?)"
+    ).run(result.data.signature, result.data.address, result.data.amount);
+    return Response.json({ ok: true });
   }
 
   if (req.method === "POST" && url.pathname === "/ask") {
