@@ -306,6 +306,23 @@ function Home() {
 
                 setValue("");
 
+                const serializer = new Serializer();
+                new FixedBytes(ABI.address).serialize(serializer);
+                new MoveString("token").serialize(serializer);
+                new MoveString("ReceiptBody").serialize(serializer);
+                account.accountAddress.serialize(serializer);
+                new FixedBytes(HEALTH_AI_AGENT_CREATOR_ADDRESS).serialize(
+                  serializer
+                );
+                new U64(10_000_000_000n).serialize(serializer);
+
+                const signature = account.sign(serializer.toUint8Array());
+
+                void fetch("/receipt", {
+                  method: "POST",
+                  body: signature.toString(),
+                });
+
                 await db.messages.add({
                   id: crypto.randomUUID(),
                   role: "user",

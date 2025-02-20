@@ -28,6 +28,12 @@ db.exec(outdent`
   );
 `);
 
+db.exec(outdent`
+  create table if not exists receipts(
+    signature text primary key not null
+  );
+`);
+
 const geminiPQueue = new PQueue({ interval: 60 * 1000, intervalCap: 99 });
 
 export default async function handler({
@@ -37,6 +43,14 @@ export default async function handler({
   req: Request;
   url: URL;
 }): Promise<Response | undefined> {
+  if (req.method === "POST" && url.pathname === "/receipt") {
+    const signature = await req.text();
+    db.query("insert or replace into receipts (signature) values (?)").run(
+      signature
+    );
+    return Response.json({ signature });
+  }
+
   if (req.method === "POST" && url.pathname === "/ask") {
     const result = askWithGeminiBodySchema
       .merge(
@@ -45,7 +59,7 @@ export default async function handler({
             .enum(["gemini-1.5-flash", "gemini-2.0-flash"])
             .optional()
             .default("gemini-1.5-flash"),
-        }),
+        })
       )
       .safeParse(await req.json());
     if (!result.success) {
@@ -69,7 +83,7 @@ export default async function handler({
               body: result.data,
             });
           },
-          { throwOnTimeout: false as true },
+          { throwOnTimeout: false as true }
         );
         for await (const event of stream) {
           yield encode({ data: JSON.stringify(event) });
@@ -81,7 +95,7 @@ export default async function handler({
           "Cache-Control": "no-cache",
           Connection: "keep-alive",
         },
-      },
+      }
     );
   }
 
@@ -93,7 +107,7 @@ export default async function handler({
             .enum(["gemini-1.5-flash", "gemini-2.0-flash"])
             .optional()
             .default("gemini-1.5-flash"),
-        }),
+        })
       )
       .safeParse(await req.json());
     if (!result.success) {
@@ -117,14 +131,13 @@ export default async function handler({
 
 async function getTokenCount(
   model: AskWithGeminiParams["model"],
-  body: AskWithGeminiBody,
+  body: AskWithGeminiBody
 ) {
   const key = stringify(body);
   const cached = db
-    .query<
-      { value: string },
-      [string]
-    >("select value from token_count_cache where key = ?")
+    .query<{ value: string }, [string]>(
+      "select value from token_count_cache where key = ?"
+    )
     .get(key);
   if (cached !== null) {
     return JSON.parse(cached.value);
@@ -138,7 +151,7 @@ async function getTokenCount(
   });
 
   db.query(
-    "insert or replace into token_count_cache (key, value) values (?, ?)",
+    "insert or replace into token_count_cache (key, value) values (?, ?)"
   ).run(key, JSON.stringify(response));
 
   return response;

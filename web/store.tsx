@@ -403,7 +403,7 @@ export class GlobalStore {
       // });
 
       // const bestPrompt = await readAll(response);
-
+      
       // console.log("The best prompt:", bestPrompt);
 
       console.log(maxNodes);
