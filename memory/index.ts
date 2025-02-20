@@ -1,4 +1,8 @@
-import { getRetrieveFactsPrompt, getUpdateMemoryPrompt } from "../ai/functions";
+import {
+  getExtractMeasurementsPrompt,
+  getRetrieveFactsPrompt,
+  getUpdateMemoryPrompt,
+} from "../ai/functions";
 import { UpdateMemoryAction } from "../ai/prompts";
 import { Embedder } from "./embedder";
 import { type Embedding } from "./types";
@@ -183,10 +187,21 @@ export class MemoryStore {
       newRetrievedFacts.facts,
     );
 
-    response = this.askWithGemini(updateMemoryPrompt.body);
-    const newMemoriesWithActions = await this.readAllAndValidate(
-      response,
-      updateMemoryPrompt.schema,
+    const measurementPrompt = getExtractMeasurementsPrompt(content);
+
+    response = askWithGemini(updateMemoryPrompt.body);
+    const [measurements, newMemoriesWithActions] = await Promise.all([
+      readAllAndValidate(
+        askWithGemini(measurementPrompt.body),
+        measurementPrompt.schema,
+      ),
+      readAllAndValidate(response, updateMemoryPrompt.schema),
+    ]);
+
+    await Promise.all(
+      measurements.measurements.map((measurement) =>
+        this.db.measurements.add({ createdAt: Date.now(), ...measurement }),
+      ),
     );
 
     const returnedMemories: Memory[] = [];

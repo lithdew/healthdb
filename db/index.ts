@@ -6,13 +6,14 @@ interface Measurement {
   id: number;
   type: string;
   unit: string;
-  value: number;
+  value: string;
   createdAt: number;
 }
 
 interface Conversation {
-  id: number;
-  content: string;
+  id: string;
+  question: string;
+  response: string;
   createdAt: number;
 }
 
@@ -34,12 +35,14 @@ interface ResearchNode {
   id: string;
   depth: number;
   messageId: string;
+  parentId?: string;
   history: { role: "model" | "user"; text: string }[];
   children: string[];
   status: "generating" | "completed";
   events: GeminiEvent[];
   buffer: string;
   createdAt: number;
+  score?: number;
 }
 
 export interface DexieSchema {

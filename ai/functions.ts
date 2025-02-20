@@ -56,7 +56,7 @@ export function getExtractMeasurementsPrompt(text: string) {
     schema: responseSchema,
     body: {
       systemInstruction: {
-        role: "system" as const,
+        role: "model" as const,
         parts: [
           {
             text: EXTRACT_MEASUREMENT_PROMPT,

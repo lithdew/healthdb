@@ -7,7 +7,7 @@ import { HNSWVectorStore } from "../memory/vector";
 import { MemoryStore } from "../memory";
 import { Embedder } from "../memory/embedder";
 import { AccountUtils, Ed25519Account } from "@aptos-labs/ts-sdk";
-import { askWithGemini } from "../ai/gemini.client";
+import { askWithGemini, readAll } from "../ai/gemini.client";
 import { outdent } from "outdent";
 import type { GeminiEvent } from "../ai/gemini";
 import PQueue from "p-queue";
@@ -211,6 +211,7 @@ interface State {
 async function visitResearchNode(
   db: Dexie & DexieSchema,
   messageId: string,
+  parentId: string | undefined,
   queue: PQueue,
   current: ResearchNode,
   prompt: string,
@@ -225,6 +226,7 @@ async function visitResearchNode(
     id: current.id,
     messageId,
     depth: current.depth,
+    parentId: parentId,
     history: structuredClone(current.history),
     children: current.children.map((c) => c.id),
     status: current.status,
@@ -279,13 +281,25 @@ async function visitResearchNode(
       createdAt: Date.now(),
     };
 
-    const score = await generateScorerResponse(current.history);
-    current.score = score;
-
+    const score = await generateScorerResponse(child.history);
+    console.info({ score });
+    child.score = score;
+    await db.researchNodes.update(child.id, {
+      ...child,
+      score,
+      children: child.children.map((c) => c.id),
+    });
     current.children.push(child);
 
     queue.add(async () => {
-      await visitResearchNode(db, messageId, queue, child, current.buffer);
+      await visitResearchNode(
+        db,
+        messageId,
+        current.id,
+        queue,
+        child,
+        current.buffer,
+      );
     });
   }
 
@@ -312,7 +326,7 @@ export class GlobalStore {
     const queue = new PQueue();
     this.state.setState((state) => ({ ...state, status: "researching" }));
 
-    let root: ResearchNode | undefined = undefined;
+    const createdAt = Date.now();
 
     try {
       for (let i = 0; i < 3; i++) {
@@ -324,25 +338,69 @@ export class GlobalStore {
           status: "generating",
           events: [],
           buffer: "",
-          createdAt: Date.now(),
+          createdAt,
         };
-        if (root === undefined) {
-          root = init;
-        }
 
         queue.add(async () => {
-          await visitResearchNode(this.db, messageId, queue, init, prompt);
+          await visitResearchNode(
+            this.db,
+            messageId,
+            undefined,
+            queue,
+            init,
+            prompt,
+          );
         });
       }
 
       await queue.onIdle();
 
       const maxNodes = await this.db.researchNodes
-        .where({ depth: 2, messageId })
+        .where({ depth: 0, messageId })
+        .reverse()
         .sortBy("score");
-      const bestPrompts = maxNodes.map((node) => node.history[0].text);
+
+      const bestPrompts = await Promise.all(
+        maxNodes.map(async (node) => {
+          let currentNode = node;
+          while (currentNode.parentId !== undefined) {
+            const parent = await this.db.researchNodes.get(
+              currentNode.parentId,
+            );
+            if (parent === undefined) {
+              throw new Error("invalid parent i d");
+            }
+            currentNode = parent;
+          }
+          return currentNode.buffer;
+        }),
+      );
       console.info({ bestPrompts });
-      return bestPrompts;
+
+      const response = askWithGemini({
+        systemInstruction: {
+          role: "model" as const,
+          parts: [
+            {
+              text: `You are HealthDB, a comprehensive health data assistant designed to help users collect, organize, and analyze their health information. These are the best example prompts of how you respond to the question of the user.: ${bestPrompts}`,
+            },
+          ],
+        },
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+      });
+
+      const bestPrompt = await readAll(response);
+
+      await this.db.conversations.add({
+        id: messageId,
+        question: prompt,
+        response: bestPrompt,
+        createdAt,
+      });
+
+      this.memory.add(prompt);
+
+      return bestPrompt;
     } finally {
       this.state.setState((state) => ({ ...state, status: "idle" }));
     }

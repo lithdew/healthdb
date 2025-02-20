@@ -1,11 +1,31 @@
 export const measurementFacets = [
   {
-    type: "HR",
+    type: "HR/Dia",
     label: "Heart Rate",
     units: ["bpm"],
   },
   {
-    type: "BP",
+    type: "HR/Pulse",
+    label: "Heart Rate",
+    units: ["bpm"],
+  },
+  {
+    type: "HR/Rate",
+    label: "Heart Rate",
+    units: ["bpm"],
+  },
+  {
+    type: "BP/Dia",
+    label: "Blood Pressure",
+    units: ["mmHg"],
+  },
+  {
+    type: "BP/Pulse",
+    label: "Blood Pressure",
+    units: ["mmHg"],
+  },
+  {
+    type: "BP/Rate",
     label: "Blood Pressure",
     units: ["mmHg"],
   },
