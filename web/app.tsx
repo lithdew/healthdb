@@ -249,7 +249,7 @@ function Home() {
     <div className="h-dvh max-h-dvh w-full bg-gray-50 flex flex-col">
       <div className="p-4 flex justify-between items-center">
         <h1 className="text-xl font-semibold">HealthDB</h1>
-        <div>
+        <div className="flex gap-2">
           <button
             className={`cursor-pointer bg-gray-300 rounded-md px-2 py-1 text-sm ${
               query.isLoading ? "animate-pulse" : ""
@@ -271,6 +271,14 @@ function Home() {
           >
             {query.isLoading ? "Loading..." : `${query.data} $HEALTH`}
           </button>
+
+          <a
+            href="https://explorer.aptoslabs.com/account/0xb37472066d5c19a3815b265357bb1b3e1d7825685c05b22c08707ecbac6b1a64?network=testnet"
+            target="_blank"
+            className="cursor-pointer bg-gray-300 rounded-md px-2 py-1 text-sm"
+          >
+            Explorer
+          </a>
         </div>
       </div>
       <div className="grow flex-1 min-h-0 overflow-y-auto">
