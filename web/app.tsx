@@ -165,7 +165,7 @@ function Home() {
 
               // @ts-expect-error - This is a valid async generator function
               for await (const event of response.body.pipeThrough(
-                new TextDecoderStream("utf-8", { fatal: true })
+                new TextDecoderStream("utf-8", { fatal: true }),
               )) {
                 console.log(event);
               }
@@ -194,7 +194,7 @@ function Home() {
             className="cursor-pointer bg-gray-300 rounded-md px-2 py-1"
             onClick={async () => {
               await store.askAndSaveToMemory(
-                "I drank too much hot chocolate, now my blood sugar is feeling high, i feel sick"
+                "I drank too much hot chocolate, now my blood sugar is feeling high, i feel sick",
               );
             }}
           >
@@ -237,7 +237,7 @@ function Home() {
               new MoveString("ReceiptBody").serialize(serializer);
               account.accountAddress.serialize(serializer);
               new FixedBytes(HEALTH_AI_AGENT_CREATOR_ADDRESS).serialize(
-                serializer
+                serializer,
               );
               new U64(10_000_000_000n).serialize(serializer);
 
@@ -264,7 +264,8 @@ function Home() {
                 I run 5km every day or two. It takes me on average 34 minutes to complete a 5k.
               `;
 
-              await store.research(PROMPT);
+              const node = await store.research(PROMPT);
+              console.info(node);
             }}
           >
             do da research

@@ -33,6 +33,7 @@ interface Event {
 interface ResearchNode {
   id: string;
   depth: number;
+  messageId: string;
   history: { role: "model" | "user"; text: string }[];
   children: string[];
   status: "generating" | "completed";

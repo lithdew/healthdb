@@ -52,6 +52,10 @@ export async function readAll(
     if (text !== undefined) {
       content += text;
     }
+
+    if (chunk.candidates[0]?.finishReason === "STOP") {
+      break;
+    }
   }
 
   return content;

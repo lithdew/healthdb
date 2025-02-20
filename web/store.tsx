@@ -11,6 +11,30 @@ import { askWithGemini } from "../ai/gemini.client";
 import { outdent } from "outdent";
 import type { GeminiEvent } from "../ai/gemini";
 import PQueue from "p-queue";
+import { readAllAndValidate } from "../ai/gemini.client";
+import { zodToVertexSchema } from "@techery/zod-to-vertex-schema";
+import { z } from "zod";
+
+const SCORER_PROMPT = outdent`
+HealthDB is a comprehensive health data assistant designed to help users collect, organize, and analyze their health information.
+
+HealthDB's primary goal is to act as an interactive health journal and guide that compiles the user's medical history, fitness goals, wearable device readings, and other health data into a structured database.
+Whenever needed, HealthDB asks specific follow-up questions to ensure that you have all the necessary information to provide useful, accurate guidance.
+
+HealthDB's goal is to help the user self-diagnose by:
+1. asking only a few, smartly-chosen follow-up questions which the user could likely easily answer to better understand the user's health or come up with a preliminary diagnosis,
+2. explaining why you asked these follow-up questions,
+3. understanding the user's intentions and symptoms and medical history and background, and
+4. providing them with as much comprehensive and explicit insight and information as possible so that they may learn and have better insight into their own health.
+
+Healthcare professionals are busy people that do not always have the time or care to be able to ask follow-up questions and gather as much information as possible from the user,
+leading to misdiagnosis or prescription errors which could sometimes lead to death. It is HealthDB's job to prevent this from happening.
+
+
+You are a helpful assistant that critically analyzes how well or how poorly HealthDB achieves it's goal.
+
+Return response in JSON schema for a score of 0-100 based on whether HealthDB has achieved its goals.
+`;
 
 const AI_PROMPT = outdent`
   <system-prompt> You are HealthDB, a comprehensive health data assistant designed to help users collect, organize, and analyze their health information.
@@ -74,9 +98,48 @@ const USER_PROMPT = outdent`
   Based on the <current-message> Respond as a user in a way that **extends the conversation naturally**, providing **useful follow-ups, additional context, or new concerns**.
 `;
 
+async function generateScorerResponse(
+  history: { role: "model" | "user"; text: string }[],
+) {
+  const collated = history
+    .map((h) => `${h.role[0].toUpperCase() + h.role.slice(1)}: ${h.text}`)
+    .join("\n");
+
+  const responseSchema = z.object({
+    score: z.number(),
+  });
+
+  const scorerPrompt = askWithGemini({
+    systemInstruction: {
+      role: "model",
+      parts: [{ text: SCORER_PROMPT }],
+    },
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: outdent`
+                    Here is the conversation between the user and HealthDB so far:
+                    {{CURRENT_CONVERSATION}}
+                  `.replace("{{CURRENT_CONVERSATION}}", collated),
+          },
+        ],
+      },
+    ],
+    generationConfig: {
+      responseMimeType: "application/json" as const,
+      responseSchema: zodToVertexSchema(responseSchema),
+    },
+  });
+
+  const response = await readAllAndValidate(scorerPrompt, responseSchema);
+  return response.score;
+}
+
 async function* generateAiResponse(
   history: { role: "model" | "user"; text: string }[],
-  message: string
+  message: string,
 ) {
   const collated = history
     .map((h) => `${h.role[0].toUpperCase() + h.role.slice(1)}: ${h.text}`)
@@ -100,7 +163,7 @@ async function* generateAiResponse(
 
 async function* generateUserResponse(
   history: { role: "model" | "user"; text: string }[],
-  message: string
+  message: string,
 ) {
   const collated = history
     .map((h) => `${h.role[0].toUpperCase() + h.role.slice(1)}: ${h.text}`)
@@ -125,6 +188,7 @@ async function* generateUserResponse(
 interface ResearchNode {
   id: string;
   depth: number;
+  score?: number;
 
   history: { role: "model" | "user"; text: string }[];
   children: ResearchNode[];
@@ -146,9 +210,10 @@ interface State {
 
 async function visitResearchNode(
   db: Dexie & DexieSchema,
+  messageId: string,
   queue: PQueue,
   current: ResearchNode,
-  prompt: string
+  prompt: string,
 ) {
   const currentRole =
     current.depth % 2 === 0 ? ("model" as const) : ("user" as const);
@@ -158,6 +223,7 @@ async function visitResearchNode(
 
   db.researchNodes.add({
     id: current.id,
+    messageId,
     depth: current.depth,
     history: structuredClone(current.history),
     children: current.children.map((c) => c.id),
@@ -213,10 +279,13 @@ async function visitResearchNode(
       createdAt: Date.now(),
     };
 
+    const score = await generateScorerResponse(current.history);
+    current.score = score;
+
     current.children.push(child);
 
     queue.add(async () => {
-      await visitResearchNode(db, queue, child, current.buffer);
+      await visitResearchNode(db, messageId, queue, child, current.buffer);
     });
   }
 
@@ -238,8 +307,12 @@ export class GlobalStore {
       return;
     }
 
+    const messageId = crypto.randomUUID();
+
     const queue = new PQueue();
     this.state.setState((state) => ({ ...state, status: "researching" }));
+
+    let root: ResearchNode | undefined = undefined;
 
     try {
       for (let i = 0; i < 3; i++) {
@@ -253,14 +326,24 @@ export class GlobalStore {
           buffer: "",
           createdAt: Date.now(),
         };
+        if (root === undefined) {
+          root = init;
+        }
 
         queue.add(async () => {
-          await visitResearchNode(this.db, queue, init, prompt);
+          await visitResearchNode(this.db, messageId, queue, init, prompt);
         });
       }
-    } finally {
+
       await queue.onIdle();
 
+      const maxNodes = await this.db.researchNodes
+        .where({ depth: 2, messageId })
+        .sortBy("score");
+      const bestPrompts = maxNodes.map((node) => node.history[0].text);
+      console.info({ bestPrompts });
+      return bestPrompts;
+    } finally {
       this.state.setState((state) => ({ ...state, status: "idle" }));
     }
   }
@@ -276,7 +359,7 @@ export class GlobalStore {
       account = Ed25519Account.generate();
       window.localStorage.setItem(
         "healthdb_keys",
-        AccountUtils.toHexString(account)
+        AccountUtils.toHexString(account),
       );
     } else {
       account = AccountUtils.ed25519AccountFromHex(encoded);
@@ -297,7 +380,7 @@ export class GlobalStore {
       conversations: "++id",
       memories: "++id",
       events: "++id",
-      researchNodes: "id",
+      researchNodes: "id,depth,messageId",
     });
     void this.db.open();
 
@@ -357,7 +440,7 @@ export const GlobalStoreProvider = ({ children }: React.PropsWithChildren) => {
 };
 
 export function useGlobalStore<TSelected = GlobalStore["state"]>(
-  selector?: (state: GlobalStore["state"]["state"]) => TSelected
+  selector?: (state: GlobalStore["state"]["state"]) => TSelected,
 ): TSelected {
   const store = useContext(GlobalStoreContext);
   if (store === null) {
