@@ -6,7 +6,7 @@ import {
   useQuery,
 } from "@tanstack/react-query";
 import { Decimal } from "decimal.js";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import type {
   AskWithGeminiBody,
   GeminiCountTokensResponse,
@@ -24,6 +24,7 @@ import {
   useMemoryStore,
 } from "./store";
 import { useLiveQuery } from "dexie-react-hooks";
+import { Drawer } from "vaul";
 
 import { outdent } from "outdent";
 import Markdown from "react-markdown";
@@ -154,7 +155,7 @@ function ResearchNodePanel({
         </div>
         <div>
           <code>
-            (Depth {node.depth + 1}) (Score: {node.score})
+            (Depth {node.depth + 1}) (Score: {node.score ?? 0})
           </code>
         </div>
       </div>
@@ -174,10 +175,10 @@ function ChatHistoryList() {
   return (
     <div className="flex flex-col-reverse gap-6">
       {(messages ?? []).map((message) => (
-        <>
-          <ChatMessage key={message.id} messageId={message.id} />
+        <Fragment key={message.id}>
           <ResearchPanel messageId={message.id} />
-        </>
+          <ChatMessage key={message.id} messageId={message.id} />
+        </Fragment>
       ))}
     </div>
   );
@@ -225,7 +226,7 @@ function Home() {
       </div>
       <motion.div className="pt-4">
         <motion.div whileHover={{ padding: 0 }} className="p-4">
-          <div className="bg-gray-200 w-full rounded-md p-6 flex gap-3">
+          <div className="bg-gray-200 w-full rounded-md p-6 flex gap-3 items-center">
             <motion.textarea
               className="p-6 rounded-md bg-gray-200 w-full field-sizing-content resize-none outline-none"
               rows={8}
@@ -234,9 +235,10 @@ function Home() {
               onChange={(e) => setValue(e.target.value)}
             />
 
-            <button
+            <motion.button
+              whileHover={{ scale: 1.05 }}
               disabled={value.trim().length === 0 || status === "researching"}
-              className="bg-blue-500 text-white px-3 py-1 text-xl rounded-md cursor-pointer disabled:cursor-not-allowed"
+              className="bg-blue-500 text-white p-4 text-xl rounded-md cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
               onClick={async (e) => {
                 e.preventDefault();
 
@@ -255,11 +257,72 @@ function Home() {
               }}
             >
               {status === "researching" ? "Thinking..." : "Send"}
-            </button>
+            </motion.button>
+
+            <MeasurementDrawer />
           </div>
         </motion.div>
       </motion.div>
     </div>
+  );
+}
+
+function MeasurementDrawer() {
+  const db = useDexie();
+
+  const measurements = useLiveQuery(async () => {
+    return db.measurements.orderBy("createdAt").reverse().toArray();
+  });
+
+  return (
+    <Drawer.Root>
+      <Drawer.Trigger asChild>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          className="bg-white text-black p-4 text-xl rounded-md cursor-pointer"
+        >
+          Measurements
+        </motion.button>
+      </Drawer.Trigger>
+      <Drawer.Portal>
+        <Drawer.Overlay className="fixed inset-0 bg-black/40" />
+        <Drawer.Content className="bg-zinc-100 flex flex-col rounded-t-[10px] h-[96%] mt-24 fixed bottom-0 left-0 right-0">
+          <div className="p-4 bg-white rounded-t-[10px] flex-1">
+            <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-zinc-300 mb-8" />
+            <div className="mx-auto">
+              <Drawer.Title className="font-medium mb-4">
+                Your measurements
+              </Drawer.Title>
+
+              <div className="grid grid-cols-5 bg-slate-200 rounded-md border divide-y">
+                <div className="col-span-full grid grid-cols-subgrid divide-x text-xs">
+                  <div className="px-2 py-1">Recorded At</div>
+                  <div className="px-2 py-1">Type</div>
+                  <div className="px-2 py-1">Unit</div>
+                  <div className="px-2 py-1">Value</div>
+                </div>
+
+                {(measurements ?? []).map((measurement, i) => {
+                  return (
+                    <div
+                      key={i}
+                      className="col-span-full grid grid-cols-subgrid divide-x text-sm"
+                    >
+                      <div className="px-2 py-1">
+                        {new Date(measurement.createdAt).toLocaleString()}
+                      </div>
+                      <div className="px-2 py-1">{measurement.type}</div>
+                      <div className="px-2 py-1">{measurement.unit}</div>
+                      <div className="px-2 py-1">{measurement.value}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
   );
 }
 

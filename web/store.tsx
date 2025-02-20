@@ -450,9 +450,9 @@ export class GlobalStore {
     this.db = new Dexie("my-db") as Dexie & DexieSchema;
     this.db.version(1).stores({
       hnswNodes: "++id",
-      measurements: "++id",
+      measurements: "++id,createdAt,updatedAt",
       conversations: "++id",
-      memories: "++id",
+      memories: "++id,createdAt,updatedAt",
       events: "++id",
       researchNodes: "[parentMessageId+id],&id,depth,createdAt,score,status",
       messages: "id,createdAt,role",
