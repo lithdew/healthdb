@@ -218,8 +218,29 @@ function Home() {
 
   return (
     <div className="h-dvh max-h-dvh w-full bg-gray-50 flex flex-col">
-      <div className="p-4">
+      <div className="p-4 flex justify-between items-center">
         <h1 className="text-xl font-semibold">HealthDB</h1>
+        <div>
+          <button
+            className="cursor-pointer bg-gray-300 rounded-md px-2 py-1 text-sm"
+            onClick={async () => {
+              const serializer = new Serializer();
+              new FixedBytes(ABI.address).serialize(serializer);
+              new MoveString("token").serialize(serializer);
+              new MoveString("ReceiptBody").serialize(serializer);
+              account.accountAddress.serialize(serializer);
+              new FixedBytes(HEALTH_AI_AGENT_CREATOR_ADDRESS).serialize(
+                serializer
+              );
+              new U64(10_000_000_000n).serialize(serializer);
+
+              const signature = account.sign(serializer.toUint8Array());
+              console.log(signature.toString());
+            }}
+          >
+            $HEALTH tokens deposited
+          </button>
+        </div>
       </div>
       <div className="grow flex-1 min-h-0 overflow-y-auto">
         <ChatHistoryList />
