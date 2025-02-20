@@ -20,6 +20,8 @@ In order to pay for the compute used to run the AI agent, a micropayment protoco
 
 The micropayments protocol is a Move smart contract that allows for deferring the finality of payments between the user and the compute used to run the AI agent in order to optimize transaction fees.
 
+A `HEALTH` token was created to represent the micropayments protocol, with intentions to have the token be used to foster a computing marketplace and developer community that powers a health-focused AI agent ecosystem.
+
 To install dependencies:
 
 ```bash
