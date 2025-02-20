@@ -1,14 +1,10 @@
 # healthdb
 
-
 HealthDB is an AI agent that organizes, collates, and enriches your personal health information. It was developed with the motivation of allowing users to have a structured, queryable database of their symptoms, health records, and medical history in order to combat [diagnostic errors that costs hundreds of thousands of lives each year](<[text](https://www.businessinsider.com/doctors-misdiagnose-lower-risk-deaths-2023-7)>).
 
 <img src="./assets/healthdb.png" alt="HealthDB" />
-<img src="./assets/healthdb_memories.png" alt="HealthDB" />
-<img src="./assets/healthdb_measurements.png" alt="HealthDB" />
 
 https://github.com/user-attachments/assets/e4962b90-78a5-4f7f-a7bb-711475ac83c2
-
 
 Data is collected from a variety of sources, including your:
 
@@ -43,3 +39,6 @@ bun dev
 ```
 
 This project was created using `bun init` in bun v1.2.3. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+
+<img src="./assets/healthdb_memories.png" alt="HealthDB" />
+<img src="./assets/healthdb_measurements.png" alt="HealthDB" />
