@@ -115,7 +115,7 @@ function ResearchPanel({ messageId }: { messageId: string }) {
   console.log(nodeIds);
 
   return (
-    <div>
+    <div className="grid grid-cols-3 gap-4 p-4">
       {(nodeIds ?? []).map(([, id]) => (
         <ResearchNodePanel key={id} messageId={messageId} nodeId={id} />
       ))}
@@ -140,11 +140,27 @@ function ResearchNodePanel({
   }
 
   return (
-    <div>
-      <code>
-        {node.id} ({node.depth}) ({node.status}) (Score: {node.score})
-      </code>
-      <Markdown>{node.buffer}</Markdown>
+    <div
+      className={`rounded-md  ${
+        node.status === "completed"
+          ? "bg-green-200"
+          : "bg-zinc-100 animate-pulse"
+      } text-sm`}
+    >
+      <div className="p-4">
+        <div className="flex gap-2 line-clamp-1">
+          <span className="font-bold line-clamp-1">MCTS Node</span>{" "}
+          <span className="line-clamp-1">{node.id}</span>
+        </div>
+        <div>
+          <code>
+            (Depth {node.depth + 1}) (Score: {node.score})
+          </code>
+        </div>
+      </div>
+      <Markdown className="max-h-48 overflow-y-auto p-4">
+        {node.buffer}
+      </Markdown>
     </div>
   );
 }
@@ -158,8 +174,10 @@ function ChatHistoryList() {
   return (
     <div className="flex flex-col-reverse gap-6">
       {(messages ?? []).map((message) => (
-        <ChatMessage key={message.id} messageId={message.id} />
-        // <ResearchPanel messageId={message.id} />
+        <>
+          <ChatMessage key={message.id} messageId={message.id} />
+          <ResearchPanel messageId={message.id} />
+        </>
       ))}
     </div>
   );
@@ -179,7 +197,7 @@ function ChatMessage({ messageId }: { messageId: string }) {
 
   return (
     <div
-      className={`w-1/2 bg-zinc-200 rounded-md p-3 ${
+      className={`w-[80%] bg-zinc-200 rounded-md p-3 ${
         message.role === "model" ? "self-start ml-4 mt-4" : "self-end mr-4 mt-4"
       }`}
     >
