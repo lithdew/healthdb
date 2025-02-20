@@ -55,11 +55,6 @@ const AI_PROMPT = outdent`
   Healthcare professionals are busy people that do not always have the time or care to be able to ask follow-up questions and gather as much information as possible from the user,
   leading to misdiagnosis or prescription errors which could sometimes lead to death. It is your job to prevent this from happening. </system-prompt>
 
-  <current-conversation>
-  {{CURRENT_CONVERSATION}}
-  </current-conversation> 
-  
-  Respond to the user message with the guidelines above and use the current-conversation as context.
 `;
 
 const USER_PROMPT = outdent`
@@ -144,11 +139,7 @@ async function* generateAiResponse(
   history: { role: "model" | "user"; text: string }[],
   message: string
 ) {
-  const collated = history
-    .map((h) => `${h.role[0].toUpperCase() + h.role.slice(1)}: ${h.text}`)
-    .join("\n");
-
-  const prompt = AI_PROMPT.replace("{{CURRENT_CONVERSATION}}", collated);
+  const prompt = AI_PROMPT;
 
   yield* askWithGemini({
     systemInstruction: {
@@ -156,9 +147,13 @@ async function* generateAiResponse(
       parts: [{ text: prompt }],
     },
     contents: [
+      ...history.map((h) => ({
+        role: h.role,
+        parts: [{ text: h.text }],
+      })),
       {
         role: "user",
-        parts: [{ text: `<current-message>${message}</current-message>` }],
+        parts: [{ text: message }],
       },
     ],
   });
@@ -258,7 +253,7 @@ async function visitResearchNode(
     children: current.children.map((c) => c.id),
   });
 
-  if (current.depth >= 1) {
+  if (current.depth >= 2) {
     return;
   }
 
@@ -339,7 +334,7 @@ export class GlobalStore {
           parentMessageId: lastMessage.id,
           id: crypto.randomUUID(),
           depth: 0,
-          history: structuredClone(history),
+          history: structuredClone(history.reverse()),
           children: [],
           status: "generating",
           events: [],
@@ -355,57 +350,66 @@ export class GlobalStore {
       await queue.onIdle();
 
       const maxNodes = await this.db.researchNodes
-        .where({ depth: 1, parentMessageId: lastMessage.id })
-        .reverse()
-        .limit(3)
-        .sortBy("score");
+        .where({ parentMessageId: lastMessage.id })
+        .toArray();
+
+      maxNodes.sort((a, b) => {
+        if (a.depth === b.depth) {
+          return (b.score ?? 0) - (a.score ?? 0);
+        }
+
+        return b.depth - a.depth;
+      });
+
+      // const maxNodeConversations: string[] = [];
+
+      // for (const node of maxNodes) {
+      //   const chat = [...node.history, { role: "model", text: node.buffer }];
+      //   maxNodeConversations.push(
+      //     chat
+      //       .map(
+      //         (c) => `${c.role[0]!.toUpperCase() + c.role.slice(1)}: ${c.text}`
+      //       )
+      //       .join("\n")
+      //   );
+      // }
+
+      // console.log(maxNodeConversations);
+
+      // const response = askWithGemini({
+      //   systemInstruction: {
+      //     role: "system" as const,
+      //     parts: [
+      //       {
+      //         text: outdent`
+      //           You are HealthDB, a comprehensive health data assistant designed to help users collect, organize, and analyze their health information.
+      //           Your primary goal is to act as an interactive health journal and guide that compiles the user’s medical history, fitness goals, wearable device readings, and other health data into a structured database.
+      //           Whenever needed, you ask specific follow-up questions to ensure that you have all the necessary information to provide useful, accurate guidance.
+
+      //           Please do NOT simply send the user off to a qualified healthcare professional.
+
+      //           Your goal is to help the user self-diagnose by:
+      //           1. asking only a few, smartly-chosen follow-up questions which the user could likely easily answer to better understand the user's health or come up with a preliminary diagnosis,
+      //           2. explaining why you asked these follow-up questions,
+      //           3. understanding the user's intentions and symptoms and medical history and background, and
+      //           4. providing them with as much comprehensive and explicit insight and information as possible so that they may learn and have better insight into their own health.
+
+      //           Healthcare professionals are busy people that do not always have the time or care to be able to ask follow-up questions and gather as much information as possible from the user,
+      //           leading to misdiagnosis or prescription errors which could sometimes lead to death. It is your job to prevent this from happening.`,
+      //       },
+      //     ],
+      //   },
+      //   contents: [{ role: "user", parts: [{ text: lastMessage.text }] }],
+      // });
+
+      // const bestPrompt = await readAll(response);
+
+      // console.log("The best prompt:", bestPrompt);
 
       console.log(maxNodes);
 
-      const maxNodeConversations: string[] = [];
-
-      for (const node of maxNodes) {
-        const chat = [...node.history, { role: "model", text: node.buffer }];
-        maxNodeConversations.push(
-          chat
-            .map(
-              (c) => `${c.role[0]!.toUpperCase() + c.role.slice(1)}: ${c.text}`
-            )
-            .join("\n")
-        );
-      }
-
-      console.log(maxNodeConversations);
-
-      const response = askWithGemini({
-        systemInstruction: {
-          role: "system" as const,
-          parts: [
-            {
-              text: outdent`
-                You are HealthDB, a comprehensive health data assistant designed to help users collect, organize, and analyze their health information.
-                Your primary goal is to act as an interactive health journal and guide that compiles the user’s medical history, fitness goals, wearable device readings, and other health data into a structured database.
-                Whenever needed, you ask specific follow-up questions to ensure that you have all the necessary information to provide useful, accurate guidance.
-                        
-                Please do NOT simply send the user off to a qualified healthcare professional.
-
-                Your goal is to help the user self-diagnose by:
-                1. asking only a few, smartly-chosen follow-up questions which the user could likely easily answer to better understand the user's health or come up with a preliminary diagnosis,
-                2. explaining why you asked these follow-up questions,
-                3. understanding the user's intentions and symptoms and medical history and background, and
-                4. providing them with as much comprehensive and explicit insight and information as possible so that they may learn and have better insight into their own health.
-
-                Healthcare professionals are busy people that do not always have the time or care to be able to ask follow-up questions and gather as much information as possible from the user,
-                leading to misdiagnosis or prescription errors which could sometimes lead to death. It is your job to prevent this from happening.`,
-            },
-          ],
-        },
-        contents: [{ role: "user", parts: [{ text: lastMessage.text }] }],
-      });
-
-      const bestPrompt = await readAll(response);
-
-      console.log("The best prompt:", bestPrompt);
+      console.log("HERE", maxNodes.at(0)!);
+      const bestPrompt = maxNodes.at(0)!.buffer;
 
       await this.db.messages.add({
         id: crypto.randomUUID(),
